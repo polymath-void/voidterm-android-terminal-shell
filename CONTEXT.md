@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 15:42 UTC  
+> **Last Synchronized**: 2026-08-08 16:41 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 16:41 UTC** `[BUILD_ENV]` **Upgraded GitHub Actions Setup Toolchains to Resolve Runner Annotations**
+  - **Details**: Updated `actions/setup-java` to `@v4` and `gradle/actions/setup-gradle` to `@v4` in `.github/workflows/ci.yml` to address GitHub Actions runner deprecation warnings and cache service notices.
+  - **Impacted Components**: [.github/workflows/ci.yml](file:///data/data/com.termux/files/home/hybrid-engine/.github/workflows/ci.yml), [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Updated.
 
 - **2026-08-08 15:42 UTC** `[TERMINAL_UI]` **Fixed App Launch Crash, Handled UnsatisfiedLinkError & Bundled jniLibs**
   - **Details**: Resolved runtime crash caused by missing `libhybrid_term_broker.so` inside the APK and unhandled `UnsatisfiedLinkError`. Updated `Broker.kt` with graceful fallback and safe JNI daemon invocation, hardened `TerminalSurfaceView.kt` canvas locking, made `MainActivity.kt` permission intents crash-proof, and packaged stripped `libhybrid_term_broker.so` into `android/app/src/main/jniLibs/arm64-v8a/`.
