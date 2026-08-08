@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 15:29 UTC  
+> **Last Synchronized**: 2026-08-08 15:35 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 15:35 UTC** `[TERMINAL_UI]` **Downloaded CI Artifacts & Initiated VoidTerm Installation**
+  - **Details**: Downloaded and unzipped `voidterm-debug-apk` from GitHub Actions CI run `31264349739`. Exported `VoidTerm-v0.1.0-alpha.apk` to `/sdcard/Download/` and triggered Android package installer via `termux-open`. Installed native CLI daemons `hybrid-term-broker` and `guest_daemon` directly into `$PREFIX/bin`.
+  - **Impacted Components**: `dist/app-debug.apk`, `/sdcard/Download/VoidTerm-v0.1.0-alpha.apk`, `$PREFIX/bin/hybrid-term-broker`, `$PREFIX/bin/guest_daemon`, [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Installed & Deployed.
 
 - **2026-08-08 15:29 UTC** `[BUILD_ENV]` **End-to-End Cloud CI Pipeline Fully Green (Rust + Android APK)**
   - **Details**: Full CI/CD build run `31264349739` succeeded completely across all jobs (`Rust IPC Broker Build` and `Android APK Build`). Cloud workflow successfully produced and uploaded both `voidterm-debug-apk` and `voidterm-rust-binaries` artifacts.
