@@ -2,9 +2,11 @@ package com.hybridengine.terminal
 
 import android.util.Log
 
-class Broker(private val terminalView: TerminalSurfaceView) {
+class Broker(var outputListener: ((String) -> Unit)? = null) {
     
     private var isNativeLoaded = false
+
+    constructor(terminalView: TerminalSurfaceView) : this({ terminalView.appendOutput(it) })
 
     init {
         try {
@@ -22,16 +24,16 @@ class Broker(private val terminalView: TerminalSurfaceView) {
         if (isNativeLoaded) {
             try {
                 startDaemon()
-                terminalView.appendOutput("🚀 VoidTerm Shell Terminal v0.1.0-alpha")
-                terminalView.appendOutput("📡 Hybrid Term Broker: Native Tokio multiplexer active.")
+                emitOutput("🚀 VoidTerm Shell Terminal v0.1.0-alpha")
+                emitOutput("📡 Hybrid Term Broker: Native Tokio multiplexer active.")
             } catch (e: Throwable) {
                 Log.e("VoidTerm", "Failed to start native daemon", e)
-                terminalView.appendOutput("⚠️ Native daemon start failed: ${e.message}")
+                emitOutput("⚠️ Native daemon start failed: ${e.message}")
             }
         } else {
-            terminalView.appendOutput("🚀 VoidTerm Shell Terminal v0.1.0-alpha")
-            terminalView.appendOutput("📡 Standalone Terminal Mode (Native Broker pending).")
-            terminalView.appendOutput("Type commands below to interact.")
+            emitOutput("🚀 VoidTerm Shell Terminal v0.1.0-alpha")
+            emitOutput("📡 Standalone Terminal Mode (Native Broker pending).")
+            emitOutput("Type commands below to interact.")
         }
     }
 
@@ -41,10 +43,10 @@ class Broker(private val terminalView: TerminalSurfaceView) {
                 sendCommand(command)
             } catch (e: Throwable) {
                 Log.e("VoidTerm", "Error sending command", e)
-                terminalView.appendOutput("⚠️ Error executing command: ${e.message}")
+                emitOutput("⚠️ Error executing command: ${e.message}")
             }
         } else {
-            terminalView.appendOutput("Executed: $command")
+            emitOutput("Executed: $command")
         }
     }
 
@@ -66,6 +68,10 @@ class Broker(private val terminalView: TerminalSurfaceView) {
     private external fun provisionDiskNative(diskPath: String, rootfsDir: String)
 
     fun onTerminalOutput(output: String) {
-        terminalView.appendOutput(output)
+        emitOutput(output)
+    }
+
+    private fun emitOutput(text: String) {
+        outputListener?.invoke(text)
     }
 }

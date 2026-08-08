@@ -39,21 +39,25 @@ class TerminalSurfaceView @JvmOverloads constructor(
     private val ansiParser = AnsiParser()
     private val terminalLines = mutableListOf<List<AnsiParser.StyledText>>()
 
+    // Active terminal configuration
+    var config: TerminalConfig = TerminalConfig(context)
+        private set
+
     // Active inline input state
     var currentInputBuffer: String = ""
     var onCommandSubmitted: ((String) -> Unit)? = null
     private val promptText = "root@voidterm:~# "
 
     private val backgroundPaint = Paint().apply {
-        color = Color.parseColor("#0A0A0A") // Deep true black
+        color = config.theme.background
     }
 
-    private var currentTextSize = 38f
+    private var currentTextSize = config.fontSize
     private val textPaint = TextPaint().apply {
         isAntiAlias = true
         typeface = Typeface.MONOSPACE
         textSize = currentTextSize
-        color = Color.parseColor("#E0E0E0")
+        color = config.theme.foreground
     }
 
     private var isScaling = false
@@ -66,7 +70,9 @@ class TerminalSurfaceView @JvmOverloads constructor(
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             val scaleFactor = detector.scaleFactor
             currentTextSize = (currentTextSize * scaleFactor).coerceIn(20f, 100f)
+            config.fontSize = currentTextSize
             textPaint.textSize = currentTextSize
+            ansiParser.applyTheme(config.theme, currentTextSize)
             triggerRender()
             return true
         }
@@ -81,6 +87,17 @@ class TerminalSurfaceView @JvmOverloads constructor(
         isFocusable = true
         isFocusableInTouchMode = true
         requestFocus()
+        applyConfig(config)
+    }
+
+    fun applyConfig(newConfig: TerminalConfig) {
+        config = newConfig
+        currentTextSize = config.fontSize
+        backgroundPaint.color = config.theme.background
+        textPaint.color = config.theme.foreground
+        textPaint.textSize = currentTextSize
+        ansiParser.applyTheme(config.theme, currentTextSize)
+        triggerRender()
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -312,7 +329,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
             }
         }
 
-        // 3. Append active prompt, user input buffer, and blinking cursor block
+        // 3. Append active prompt, user input buffer, and blinking cursor
         if (spannableBuilder.isNotEmpty()) {
             spannableBuilder.append("\n")
         }
@@ -321,7 +338,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
         spannableBuilder.append(promptText)
         val promptEnd = spannableBuilder.length
         spannableBuilder.setSpan(
-            ForegroundColorSpan(Color.parseColor("#50FA7B")), // Vibrant Dracula Green
+            ForegroundColorSpan(config.theme.promptColor),
             promptStart,
             promptEnd,
             Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
@@ -339,21 +356,25 @@ class TerminalSurfaceView @JvmOverloads constructor(
         val inputEnd = spannableBuilder.length
         if (inputEnd > inputStart) {
             spannableBuilder.setSpan(
-                ForegroundColorSpan(Color.parseColor("#F8F8F2")),
+                ForegroundColorSpan(config.theme.foreground),
                 inputStart,
                 inputEnd,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
         }
 
-        // Blinking cursor block (500ms cadence)
-        val isCursorVisible = (System.currentTimeMillis() / 500) % 2 == 0L
-        val cursorBlock = if (isCursorVisible) "█" else " "
+        // Configurable cursor shape & 500ms blinking timer
+        val isCursorVisible = if (config.cursorBlink) {
+            (System.currentTimeMillis() / 500) % 2 == 0L
+        } else {
+            true
+        }
+        val cursorSymbol = if (isCursorVisible) config.cursorStyle.symbol else " "
         val cursorStart = spannableBuilder.length
-        spannableBuilder.append(cursorBlock)
+        spannableBuilder.append(cursorSymbol)
         val cursorEnd = spannableBuilder.length
         spannableBuilder.setSpan(
-            ForegroundColorSpan(Color.parseColor("#8BE9FD")), // Cyan cursor
+            ForegroundColorSpan(config.theme.cursor),
             cursorStart,
             cursorEnd,
             Spannable.SPAN_EXCLUSIVE_EXCLUSIVE

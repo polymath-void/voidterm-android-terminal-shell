@@ -11,12 +11,21 @@ class AnsiParser {
     // Regex to capture standard ANSI color/formatting codes: \x1b[...m
     private val ansiRegex = Regex("\u001B\\[([0-9;]*)m")
     
+    // Active theme colors
+    var activeTheme: TerminalTheme = TerminalTheme.DRACULA
+
     // Default terminal aesthetic
     val defaultTextPaint = Paint().apply {
-        color = Color.parseColor("#E0E0E0") // Off-white/Gray
-        textSize = 42f
+        color = activeTheme.foreground
+        textSize = 38f
         isAntiAlias = true
         typeface = Typeface.MONOSPACE
+    }
+
+    fun applyTheme(theme: TerminalTheme, textSize: Float) {
+        activeTheme = theme
+        defaultTextPaint.color = theme.foreground
+        defaultTextPaint.textSize = textSize
     }
 
     /**
@@ -90,22 +99,22 @@ class AnsiParser {
         for (code in codes) {
             when (code) {
                 1 -> newPaint.isFakeBoldText = true // Bold
-                30 -> newPaint.color = Color.parseColor("#0A0A0A") // Black
-                31 -> newPaint.color = Color.parseColor("#FF5555") // Red
-                32 -> newPaint.color = Color.parseColor("#50FA7B") // Green
-                33 -> newPaint.color = Color.parseColor("#F1FA8C") // Yellow
-                34 -> newPaint.color = Color.parseColor("#BD93F9") // Blue
-                35 -> newPaint.color = Color.parseColor("#FF79C6") // Magenta
-                36 -> newPaint.color = Color.parseColor("#8BE9FD") // Cyan
-                37 -> newPaint.color = Color.parseColor("#F8F8F2") // White
-                90 -> newPaint.color = Color.parseColor("#6272A4") // Bright Black (Gray)
-                91 -> newPaint.color = Color.parseColor("#FF6E6E") // Bright Red
-                92 -> newPaint.color = Color.parseColor("#69FF94") // Bright Green
-                93 -> newPaint.color = Color.parseColor("#FFFFA5") // Bright Yellow
-                94 -> newPaint.color = Color.parseColor("#D6ACFF") // Bright Blue
-                95 -> newPaint.color = Color.parseColor("#FF92DF") // Bright Magenta
-                96 -> newPaint.color = Color.parseColor("#A4FFFF") // Bright Cyan
-                97 -> newPaint.color = Color.parseColor("#FFFFFF") // Bright White
+                30 -> newPaint.color = activeTheme.ansiColors[0] // Black
+                31 -> newPaint.color = activeTheme.ansiColors[1] // Red
+                32 -> newPaint.color = activeTheme.ansiColors[2] // Green
+                33 -> newPaint.color = activeTheme.ansiColors[3] // Yellow
+                34 -> newPaint.color = activeTheme.ansiColors[4] // Blue
+                35 -> newPaint.color = activeTheme.ansiColors[5] // Magenta
+                36 -> newPaint.color = activeTheme.ansiColors[6] // Cyan
+                37 -> newPaint.color = activeTheme.ansiColors[7] // White
+                90 -> newPaint.color = activeTheme.ansiColors[0] // Bright Black
+                91 -> newPaint.color = activeTheme.ansiColors[1] // Bright Red
+                92 -> newPaint.color = activeTheme.ansiColors[2] // Bright Green
+                93 -> newPaint.color = activeTheme.ansiColors[3] // Bright Yellow
+                94 -> newPaint.color = activeTheme.ansiColors[4] // Bright Blue
+                95 -> newPaint.color = activeTheme.ansiColors[5] // Bright Magenta
+                96 -> newPaint.color = activeTheme.ansiColors[6] // Bright Cyan
+                97 -> newPaint.color = activeTheme.ansiColors[7] // Bright White
             }
         }
         return newPaint

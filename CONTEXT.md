@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 21:18 UTC  
+> **Last Synchronized**: 2026-08-08 21:20 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 21:20 UTC** `[TERMINAL_UI]` **UI/UX Overhaul: Terminal Configuration Engine & Foreground Service**
+  - **Details**: (1) Created `TerminalService.kt` extending `Service` to maintain `VmManager` and `Broker` lifecycles independent of UI destruction. (2) Implemented low-priority ongoing foreground notification (`voidterm_vm_foreground_channel`) with "Shutdown VM" PendingIntent action and activity tap routing. (3) Declared `FOREGROUND_SERVICE` and `POST_NOTIFICATIONS` permissions with `specialUse` service declaration in `AndroidManifest.xml`. (4) Built `TerminalConfig.kt` using `SharedPreferences` supporting `TerminalTheme` (Dracula, Nord, Monokai with exact 8-color ANSI HEX maps), configurable `fontSize`, `CursorStyle` (Block `█`, Underline `_`, Bar `|`), and `cursorBlink` (500ms toggle timer). (5) Injected `TerminalConfig` into `TerminalSurfaceView.kt` and `AnsiParser.kt` with live dynamic paint and cursor re-styling. (6) Updated `MainActivity.kt` to bind to `TerminalService`.
+  - **Impacted Components**: [android/app/src/main/kotlin/com/hybridengine/terminal/TerminalService.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/TerminalService.kt), [android/app/src/main/kotlin/com/hybridengine/terminal/TerminalConfig.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/TerminalConfig.kt), [android/app/src/main/kotlin/com/hybridengine/terminal/TerminalSurfaceView.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/TerminalSurfaceView.kt), [android/app/src/main/kotlin/com/hybridengine/terminal/AnsiParser.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/AnsiParser.kt), [android/app/src/main/kotlin/com/hybridengine/terminal/Broker.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/Broker.kt), [android/app/src/main/kotlin/com/hybridengine/terminal/MainActivity.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/MainActivity.kt), [android/app/src/main/AndroidManifest.xml](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/AndroidManifest.xml), [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Implemented & Verified.
 
 - **2026-08-08 21:18 UTC** `[VSOCK_BUS]` **Implemented Vsock Boot Retry Loop & Static Musl Guest Daemon Build**
   - **Details**: (1) Implemented `VmBridge::connect_guest_daemon` with a 10-attempt retry loop and 500ms delay to absorb the 2-5 second VM boot initialization latency before returning errors. (2) Updated CI workflow (`.github/workflows/ci.yml`) to compile `guest_daemon` using `aarch64-unknown-linux-musl` static linking to eliminate Android Bionic `/system/bin/linker64` runtime dependency on Debian Linux. (3) Updated `OsInstaller.kt` and `storage.rs` to bundle and copy static `guest_daemon` from assets/internal storage into `/usr/local/bin/guest_daemon` with `0o755` permissions. (4) Rebuilt and packaged stripped `libhybrid_term_broker.so`.
