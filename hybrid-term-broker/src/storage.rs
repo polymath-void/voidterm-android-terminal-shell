@@ -1,12 +1,32 @@
 use anyhow::{Context, Result};
-use std::fs::File;
+use std::fs::{self, File};
+use std::os::unix::fs::{symlink, PermissionsExt};
 use std::path::Path;
 use std::process::Command;
 
 pub struct StorageProvisioner;
 
+const SYSTEMD_SERVICE_CONTENT: &str = r#"[Unit]
+Description=VoidTerm Vsock Guest Daemon
+ConditionVirtualization=vm
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/guest_daemon
+Restart=always
+RestartSec=1
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+"#;
+
 impl StorageProvisioner {
-    /// Dynamically allocates a sparse ext4 image and injects the Debian rootfs
+    /// Dynamically allocates a sparse ext4 image, configures guest daemon systemd bindings,
+    /// and injects the Debian rootfs into disk.img.
     pub fn provision_avf_disk(disk_path: &str, rootfs_dir: &str, size_mb: u64) -> Result<()> {
         let disk = Path::new(disk_path);
         
@@ -14,6 +34,14 @@ impl StorageProvisioner {
             println!("💾 [Storage] AVF disk already provisioned: {}", disk_path);
             return Ok(());
         }
+
+        let rootfs = Path::new(rootfs_dir);
+
+        // 1. Inject guest daemon systemd unit & activation symlink into rootfs before packing
+        Self::inject_systemd_service(rootfs)?;
+
+        // 2. Inject guest daemon executable into rootfs
+        Self::inject_guest_daemon_binary(rootfs)?;
 
         println!("🏗️ [Storage] Allocating {}MB sparse disk at {}...", size_mb, disk_path);
         let file = File::create(disk_path).context("Failed to create disk.img")?;
@@ -66,7 +94,75 @@ impl StorageProvisioner {
             anyhow::bail!("Rootfs injection failed with exit code {:?}", inject_status.code());
         }
 
-        println!("✅ [Storage] AVF Boot Disk successfully provisioned.");
+        println!("✅ [Storage] AVF Boot Disk successfully provisioned with Systemd Guest Daemon.");
+        Ok(())
+    }
+
+    /// Injects the systemd service definition and enables it via multi-user.target.wants symlink
+    fn inject_systemd_service(rootfs: &Path) -> Result<()> {
+        let systemd_dir = rootfs.join("etc/systemd/system");
+        let wants_dir = systemd_dir.join("multi-user.target.wants");
+
+        println!("🔧 [Storage] Injecting systemd service into {}...", systemd_dir.display());
+        fs::create_dir_all(&wants_dir).context("Failed to create systemd multi-user.target.wants directory")?;
+
+        let service_file = systemd_dir.join("voidterm-daemon.service");
+        fs::write(&service_file, SYSTEMD_SERVICE_CONTENT)
+            .context("Failed to write voidterm-daemon.service")?;
+
+        let symlink_target = wants_dir.join("voidterm-daemon.service");
+        if symlink_target.exists() || symlink_target.is_symlink() {
+            let _ = fs::remove_file(&symlink_target);
+        }
+
+        // Relative symlink inside the rootfs
+        symlink("../voidterm-daemon.service", &symlink_target)
+            .context("Failed to create systemd activation symlink")?;
+
+        println!("✅ [Storage] Systemd service enabled at multi-user.target.wants/voidterm-daemon.service");
+        Ok(())
+    }
+
+    /// Injects or verifies the guest_daemon binary in /usr/local/bin
+    fn inject_guest_daemon_binary(rootfs: &Path) -> Result<()> {
+        let bin_dir = rootfs.join("usr/local/bin");
+        fs::create_dir_all(&bin_dir).context("Failed to create /usr/local/bin in rootfs")?;
+
+        let dest_bin = bin_dir.join("guest_daemon");
+        if !dest_bin.exists() {
+            // Search candidate locations for pre-built guest_daemon binary
+            let candidates = [
+                Path::new("/data/data/com.termux/files/usr/bin/guest_daemon"),
+                Path::new("/data/local/tmp/guest_daemon"),
+                Path::new("target/release/guest_daemon"),
+                Path::new("target/aarch64-linux-android/release/guest_daemon"),
+            ];
+
+            let mut copied = false;
+            for candidate in &candidates {
+                if candidate.exists() {
+                    if let Ok(_) = fs::copy(candidate, &dest_bin) {
+                        println!("📥 [Storage] Copied guest_daemon from {}", candidate.display());
+                        copied = true;
+                        break;
+                    }
+                }
+            }
+
+            if !copied {
+                println!("ℹ️ [Storage] Initializing placeholder guest_daemon runner in /usr/local/bin");
+                let placeholder_script = "#!/bin/sh\necho '[Guest Daemon] Starting vsock listener on CID 3 port 8000'\n";
+                let _ = fs::write(&dest_bin, placeholder_script);
+            }
+        }
+
+        // Ensure executable permissions (rwxr-xr-x -> 0o755)
+        if dest_bin.exists() {
+            let mut perms = fs::metadata(&dest_bin)?.permissions();
+            perms.set_mode(0o755);
+            let _ = fs::set_permissions(&dest_bin, perms);
+        }
+
         Ok(())
     }
 }

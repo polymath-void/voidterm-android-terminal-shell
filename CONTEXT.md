@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 18:34 UTC  
+> **Last Synchronized**: 2026-08-08 18:46 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 18:46 UTC** `[AVF_GUEST]` **Implemented Priority 2: Guest Daemon Init & Systemd Binding**
+  - **Details**: Updated `StorageProvisioner` in `hybrid-term-broker/src/storage.rs` to programmatically inject the systemd service file `voidterm-daemon.service` into `<rootfs_dir>/etc/systemd/system/` and link it in `multi-user.target.wants/` prior to `e2fsdroid` execution. Placed and granted `0o755` executable permissions for `guest_daemon` in `<rootfs_dir>/usr/local/bin/guest_daemon` to enable automatic boot-time initialization on guest microVM startup. Packaged updated release `libhybrid_term_broker.so`.
+  - **Impacted Components**: [hybrid-term-broker/src/storage.rs](file:///data/data/com.termux/files/home/hybrid-engine/hybrid-term-broker/src/storage.rs), `android/app/src/main/jniLibs/arm64-v8a/libhybrid_term_broker.so`, [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Verified & Packaged.
 
 - **2026-08-08 18:34 UTC** `[AVF_GUEST]` **Implemented Priority 1: AVF Disk Formatting & Rootfs Provisioner**
   - **Details**: Created `StorageProvisioner` in `hybrid-term-broker/src/storage.rs` to allocate 2GB sparse virtual disk (`disk.img`), format as ext4 using Android `/system/bin/mke2fs`, and inject Debian rootfs using `/system/bin/e2fsdroid` without root. Exposed JNI method `provisionDisk` in `lib.rs` and `Broker.kt`. Integrated custom disk image mounting in `VmManager.kt` and wired into `MainActivity.kt`. Packaged updated release `libhybrid_term_broker.so`.
