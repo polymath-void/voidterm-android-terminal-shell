@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 14:52 UTC  
+> **Last Synchronized**: 2026-08-08 14:59 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -83,7 +83,6 @@ flowchart TD
 ```
 /data/data/com.termux/files/home/hybrid-engine/
 ├── Cargo.toml              # Root Cargo Workspace definition
-├── core.md                 # Canonical Architectural Plan & Design Philosophy
 ├── AGENTS.md               # Strict Governance & Categorized Logging Protocol
 ├── CONTEXT.md              # Living Context & Project Status Matrix
 ├── hybrid-term-broker/     # [BROKER_IPC] Rust Daemon & Multiplexer Crate
@@ -116,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 14:59 UTC** `[REFACTOR]` **Consolidated Architectural Documentation & Removed Redundant core.md**
+  - **Details**: Eliminated duplicate documentation by removing `core.md` and designating `CONTEXT.md` as the single canonical source of truth for living architecture, subsystem specifications, and event logs. Updated `AGENTS.md`, `README.md`, and workspace tree references.
+  - **Impacted Components**: [AGENTS.md](file:///data/data/com.termux/files/home/hybrid-engine/AGENTS.md), [README.md](file:///data/data/com.termux/files/home/hybrid-engine/README.md), [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Cleaned & Synchronized.
 
 - **2026-08-08 14:52 UTC** `[BUILD_ENV]` **Activated GitHub Actions CI Workflow on Git Push**
   - **Details**: Configured direct SSH transport with GitHub (`git@ssh.github.com:polymath-void/voidterm-android-terminal-shell.git`), staged and pushed `.github/workflows/ci.yml`. Verified live automated execution of the CI workflow pipeline on push event.

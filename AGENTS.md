@@ -13,7 +13,7 @@ The **Hybrid Engine** is a high-performance Android execution environment combin
 ## 2. Core Operational Directives (STRICT ENFORCEMENT)
 
 ### Rule 1: Mandatory Context Synchronization (`CONTEXT.md`)
-1. **Pre-Task Check**: Every agent session or subagent invocation MUST review [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md) and [core.md](file:///data/data/com.termux/files/home/hybrid-engine/core.md) before making modifications.
+1. **Pre-Task Check**: Every agent session or subagent invocation MUST review [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md) before making modifications.
 2. **Atomic Context Updates**: Whenever any subsystem is modified, designed, refactored, or tested, the agent MUST immediately update [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
 3. **No Phantom State**: Never introduce architectural components, configuration flags, or protocol changes without recording them in [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
 

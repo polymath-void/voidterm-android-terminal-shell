@@ -91,7 +91,6 @@ flowchart TD
 ├── AGENTS.md                # Repository governance & operational directives
 ├── CONTEXT.md               # Living architecture & event logging matrix
 ├── Cargo.toml               # Cargo workspace root
-├── core.md                  # System design specifications
 ├── android/                 # Android Terminal Application
 │   └── app/
 │       └── src/main/
