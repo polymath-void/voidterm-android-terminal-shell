@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 17:06 UTC  
+> **Last Synchronized**: 2026-08-08 17:35 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 17:35 UTC** `[AVF_GUEST]` **Integrated Phase 7 AVF Permissions & VirtualMachineManager Orchestrator**
+  - **Details**: Added `android.permission.MANAGE_VIRTUAL_MACHINE` to `AndroidManifest.xml`. Implemented `VmManager.kt` with resilient `VirtualMachineManager` lifecycle management (512MB RAM allocation, host CPU topology, full debug logging, and graceful teardown on activity destruction). Wired `VmManager` into `MainActivity.kt` boot sequence.
+  - **Impacted Components**: [android/app/src/main/AndroidManifest.xml](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/AndroidManifest.xml), [android/app/src/main/kotlin/com/hybridengine/terminal/VmManager.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/VmManager.kt), [android/app/src/main/kotlin/com/hybridengine/terminal/MainActivity.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/MainActivity.kt), [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Verified & Integrated.
 
 - **2026-08-08 17:06 UTC** `[BROKER_IPC]` **Integrated Phase 6 Step 1 Local PTY Engine into Rust Broker**
   - **Details**: Implemented `LocalPty` in `hybrid-term-broker/src/local_pty.rs` with native Android POSIX master/slave pseudo-terminal (`openpty`), 80x24 window geometry, persistent `/system/bin/sh` shell session, `xterm-256color` environment, non-blocking background output streaming, and direct command input routing. Updated `IpcMessage::ExecuteLocal` and JNI `startDaemon`/`sendCommand` bindings.

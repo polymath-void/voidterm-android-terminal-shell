@@ -17,6 +17,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var terminalSurface: TerminalSurfaceView
     private lateinit var broker: Broker
+    private lateinit var vmManager: VmManager
     private lateinit var commandInput: EditText
     private lateinit var btnSend: Button
 
@@ -24,23 +25,27 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. Initialize Views
-        terminalSurface = findViewById(R.id.terminal_surface)
-        commandInput = findViewById(R.id.command_input)
-        btnSend = findViewById(R.id.btn_send)
-
-        // 2. Initialize the Broker & start engine
-        broker = Broker(terminalSurface)
-        broker.start()
-
-        // 3. Request Storage Permissions safely
+        // 1. Request Storage Permissions safely
         try {
             requestStoragePermissions()
         } catch (e: Exception) {
             Log.w("VoidTerm", "Storage permission request error: ${e.message}")
         }
 
-        // 4. Setup Input Listeners
+        // 2. Initialize Views
+        terminalSurface = findViewById(R.id.terminal_surface)
+        commandInput = findViewById(R.id.command_input)
+        btnSend = findViewById(R.id.btn_send)
+
+        // 3. Initialize and boot the hardware-accelerated Linux VM (AVF)
+        vmManager = VmManager(this)
+        vmManager.startLiteLinuxVm()
+
+        // 4. Initialize the Broker & start native engine
+        broker = Broker(terminalSurface)
+        broker.start()
+
+        // 5. Setup Input Listeners
         btnSend.setOnClickListener {
             dispatchCommand()
         }
@@ -54,6 +59,12 @@ class MainActivity : AppCompatActivity() {
                 false
             }
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Ensure we gracefully kill the microVM to free up device RAM
+        vmManager.stopVm()
     }
 
     private fun requestStoragePermissions() {
@@ -79,9 +90,6 @@ class MainActivity : AppCompatActivity() {
     private fun dispatchCommand() {
         val command = commandInput.text.toString().trim()
         if (command.isNotEmpty()) {
-            // Echo the command to the screen visually
-            terminalSurface.appendOutput("\nuser@voidterm:~$ $command")
-            
             // Push the command down through the broker
             broker.send(command)
             
