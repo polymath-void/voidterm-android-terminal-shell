@@ -57,7 +57,9 @@ Every event, modification, architectural decision, or validation test MUST be ap
 ### 3. Guest Linux VM & AVF
 - **Hypervisor Boundary**: The microVM runs under `crosvm` managed by Android's `VirtualizationService` (AIDL).
 - **No Emulation Penalties**: VM executes raw ARM64/AArch64 `glibc` ELF binaries natively.
-- **Vsock Topology**: Android Host always binds to `CID 2`. The guest VM connects to Host CID 2, and the guest listener daemon binds to `VMADDR_CID_ANY` on designated port.
+- **Vsock Topology**: Android Host always binds to `CID 2`. The guest VM connects to Host CID 2, and the guest listener daemon binds to `VMADDR_CID_ANY` on designated port (default: CID 3, port 8000).
+- **Zero-Root ext4 Provisioning**: Virtual disk images (`disk.img`) are dynamically allocated as sparse files, formatted via Android user-space `/system/bin/mke2fs`, and populated with Debian rootfs via `/system/bin/e2fsdroid` without root privileges.
+- **Guest Daemon Autostart**: Systemd unit (`voidterm-daemon.service`) and `multi-user.target.wants` symlinks are embedded into rootfs during provisioning to autostart `guest_daemon` as PID 1 service.
 
 ### 4. Terminal UI / JNI Layer
 - **libvterm Integrity**: Render terminal grid states through C++ `libvterm` wrapper.
