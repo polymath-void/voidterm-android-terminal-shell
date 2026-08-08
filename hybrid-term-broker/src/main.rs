@@ -1,6 +1,8 @@
+mod local_pty;
 mod vm_bridge;
 mod wasm_engine;
 
+use local_pty::LocalPty;
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use vm_bridge::VmBridge;
@@ -12,6 +14,7 @@ const VM_VSOCK_PORT: u32 = 8000;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum IpcMessage {
+    ExecuteLocal { command: String },
     ExecuteWasm { module_name: String, args: Vec<String> },
     ExecuteVm { command: String },
     TerminalOutput(String),
@@ -19,10 +22,18 @@ pub enum IpcMessage {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    println!("🚀 Hybrid Term Broker initialized.");
+    println!("🚀 VoidTerm Hybrid IPC Broker initialized.");
 
     let (tx_output, mut rx_output) = mpsc::channel::<IpcMessage>(1024);
     let (_tx_input, mut rx_input) = mpsc::channel::<IpcMessage>(1024);
+
+    let local_shell = match LocalPty::start(tx_output.clone()) {
+        Ok(pty) => Some(pty),
+        Err(e) => {
+            eprintln!("❌ [Local PTY Error]: {}", e);
+            None
+        }
+    };
 
     println!("📡 Listening for cross-environment multiplexing...");
 
@@ -31,6 +42,14 @@ async fn main() -> anyhow::Result<()> {
             // 1. Ingress UI Commands Routing
             Some(input_msg) = rx_input.recv() => {
                 match input_msg {
+                    IpcMessage::ExecuteLocal { command } => {
+                        if let Some(ref pty) = local_shell {
+                            if let Err(e) = pty.write_command(&command) {
+                                let err_msg = format!("❌ [PTY Error]: {}\n", e);
+                                let _ = tx_output.send(IpcMessage::TerminalOutput(err_msg)).await;
+                            }
+                        }
+                    }
                     IpcMessage::ExecuteWasm { module_name, args } => {
                         let tx_clone = tx_output.clone();
                         tokio::spawn(async move {
@@ -42,7 +61,6 @@ async fn main() -> anyhow::Result<()> {
                     }
                     IpcMessage::ExecuteVm { command } => {
                         let tx_clone = tx_output.clone();
-                        // Spawn non-blocking task to send workload over hypervisor bus
                         tokio::spawn(async move {
                             if let Err(e) = VmBridge::dispatch_command(
                                 command, 

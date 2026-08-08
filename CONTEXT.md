@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 16:41 UTC  
+> **Last Synchronized**: 2026-08-08 17:06 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 17:06 UTC** `[BROKER_IPC]` **Integrated Phase 6 Step 1 Local PTY Engine into Rust Broker**
+  - **Details**: Implemented `LocalPty` in `hybrid-term-broker/src/local_pty.rs` with native Android POSIX master/slave pseudo-terminal (`openpty`), 80x24 window geometry, persistent `/system/bin/sh` shell session, `xterm-256color` environment, non-blocking background output streaming, and direct command input routing. Updated `IpcMessage::ExecuteLocal` and JNI `startDaemon`/`sendCommand` bindings.
+  - **Impacted Components**: [hybrid-term-broker/Cargo.toml](file:///data/data/com.termux/files/home/hybrid-engine/hybrid-term-broker/Cargo.toml), [hybrid-term-broker/src/local_pty.rs](file:///data/data/com.termux/files/home/hybrid-engine/hybrid-term-broker/src/local_pty.rs), [hybrid-term-broker/src/lib.rs](file:///data/data/com.termux/files/home/hybrid-engine/hybrid-term-broker/src/lib.rs), [hybrid-term-broker/src/main.rs](file:///data/data/com.termux/files/home/hybrid-engine/hybrid-term-broker/src/main.rs), `android/app/src/main/jniLibs/arm64-v8a/libhybrid_term_broker.so`, [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Verified & Packaged.
 
 - **2026-08-08 16:41 UTC** `[BUILD_ENV]` **Upgraded GitHub Actions Setup Toolchains to Resolve Runner Annotations**
   - **Details**: Updated `actions/setup-java` to `@v4` and `gradle/actions/setup-gradle` to `@v4` in `.github/workflows/ci.yml` to address GitHub Actions runner deprecation warnings and cache service notices.
