@@ -14,25 +14,35 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Rust Toolchain (aarch64-linux-android)
+      - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
 
-      - name: Cargo Check & Build
+      - name: Cargo Check (aarch64-linux-android)
         run: |
           cd hybrid-term-broker
           cargo check --target aarch64-linux-android
-          cargo build --target aarch64-linux-android
+
+      - name: Cargo Check & Test (Host)
+        run: |
+          cd hybrid-term-broker
+          cargo check
+          cargo test --lib
+
+      - name: Build Host Binaries
+        run: |
+          cd hybrid-term-broker
+          cargo build
 
       - name: Upload Rust Binaries Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: voidterm-rust-aarch64-binaries
+          name: voidterm-rust-binaries
           path: |
             **/target/**/hybrid-term-broker
             **/target/**/guest_daemon
-            **/target/**/libhybrid_term_broker.so
+            **/target/**/libhybrid_term_broker.*
           if-no-files-found: warn
 
   build-android:
