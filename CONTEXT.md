@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 15:35 UTC  
+> **Last Synchronized**: 2026-08-08 15:42 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 15:42 UTC** `[TERMINAL_UI]` **Fixed App Launch Crash, Handled UnsatisfiedLinkError & Bundled jniLibs**
+  - **Details**: Resolved runtime crash caused by missing `libhybrid_term_broker.so` inside the APK and unhandled `UnsatisfiedLinkError`. Updated `Broker.kt` with graceful fallback and safe JNI daemon invocation, hardened `TerminalSurfaceView.kt` canvas locking, made `MainActivity.kt` permission intents crash-proof, and packaged stripped `libhybrid_term_broker.so` into `android/app/src/main/jniLibs/arm64-v8a/`.
+  - **Impacted Components**: [android/app/src/main/kotlin/com/hybridengine/terminal/Broker.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/Broker.kt), [android/app/src/main/kotlin/com/hybridengine/terminal/MainActivity.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/MainActivity.kt), [android/app/src/main/kotlin/com/hybridengine/terminal/TerminalSurfaceView.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/TerminalSurfaceView.kt), [android/app/build.gradle.kts](file:///data/data/com.termux/files/home/hybrid-engine/android/app/build.gradle.kts), `android/app/src/main/jniLibs/arm64-v8a/libhybrid_term_broker.so`, [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Fixed & Pushed.
 
 - **2026-08-08 15:35 UTC** `[TERMINAL_UI]` **Downloaded CI Artifacts & Initiated VoidTerm Installation**
   - **Details**: Downloaded and unzipped `voidterm-debug-apk` from GitHub Actions CI run `31264349739`. Exported `VoidTerm-v0.1.0-alpha.apk` to `/sdcard/Download/` and triggered Android package installer via `termux-open`. Installed native CLI daemons `hybrid-term-broker` and `guest_daemon` directly into `$PREFIX/bin`.

@@ -5,7 +5,9 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.os.Build
 import android.util.AttributeSet
+import android.util.Log
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 
@@ -16,6 +18,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
 ) : SurfaceView(context, attrs, defStyleAttr), SurfaceHolder.Callback, Runnable {
 
     private var drawingThread: Thread? = null
+    @Volatile
     private var isRunning = false
     private val textBuffer = mutableListOf<String>()
     
@@ -35,14 +38,13 @@ class TerminalSurfaceView @JvmOverloads constructor(
         holder.addCallback(this)
     }
 
-    // Safely append new text from the Rust Broker
+    // Safely append new text from the Broker
     fun appendOutput(text: String) {
         synchronized(textBuffer) {
-            // Split incoming streams into lines for the buffer
             val lines = text.split("\n")
             textBuffer.addAll(lines)
             
-            // Keep buffer from infinitely expanding (e.g., retain last 500 lines)
+            // Keep buffer bounded
             if (textBuffer.size > 500) {
                 textBuffer.subList(0, textBuffer.size - 500).clear()
             }
@@ -51,42 +53,59 @@ class TerminalSurfaceView @JvmOverloads constructor(
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         isRunning = true
-        drawingThread = Thread(this).apply { start() }
+        drawingThread = Thread(this, "VoidTerm-Renderer").apply { start() }
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
-        var retry = true
         isRunning = false
-        while (retry) {
-            try {
-                drawingThread?.join()
-                retry = false
-            } catch (e: InterruptedException) {
-                e.printStackTrace()
-            }
+        try {
+            drawingThread?.join(500)
+        } catch (e: InterruptedException) {
+            Log.w("VoidTerm", "Drawing thread join interrupted")
         }
     }
 
     override fun run() {
         while (isRunning) {
-            if (!holder.surface.isValid) continue
+            if (!holder.surface.isValid) {
+                try {
+                    Thread.sleep(16)
+                } catch (_: Exception) {}
+                continue
+            }
 
             var canvas: Canvas? = null
             try {
-                canvas = holder.lockHardwareCanvas() // Hardware accelerated drawing
+                canvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    try {
+                        holder.lockHardwareCanvas()
+                    } catch (_: Exception) {
+                        holder.lockCanvas()
+                    }
+                } else {
+                    holder.lockCanvas()
+                }
+
                 if (canvas != null) {
                     drawTerminal(canvas)
                 }
+            } catch (e: Exception) {
+                Log.e("VoidTerm", "Error drawing frame: ${e.message}")
             } finally {
                 if (canvas != null) {
-                    holder.unlockCanvasAndPost(canvas)
+                    try {
+                        holder.unlockCanvasAndPost(canvas)
+                    } catch (e: Exception) {
+                        Log.e("VoidTerm", "Error posting canvas: ${e.message}")
+                    }
                 }
             }
             
-            // Limit to ~60fps to save battery while remaining visually instantaneous
-            Thread.sleep(16) 
+            try {
+                Thread.sleep(16) // ~60fps
+            } catch (_: Exception) {}
         }
     }
 
@@ -94,13 +113,12 @@ class TerminalSurfaceView @JvmOverloads constructor(
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
 
         synchronized(textBuffer) {
-            var yOffset = height.toFloat() - 50f // Start drawing from the bottom
+            var yOffset = height.toFloat() - 50f
             
-            // Draw lines bottom-to-top to mimic standard terminal scrolling
             for (i in textBuffer.indices.reversed()) {
-                if (yOffset < 0) break // Stop drawing if it's off-screen
+                if (yOffset < 0) break
                 canvas.drawText(textBuffer[i], 20f, yOffset, textPaint)
-                yOffset -= (textPaint.textSize + 10f) // Line height spacing
+                yOffset -= (textPaint.textSize + 10f)
             }
         }
     }
