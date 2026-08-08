@@ -44,13 +44,13 @@ class MainActivity : AppCompatActivity() {
             Log.w("VoidTerm", "OsInstaller initialization notice: ${e.message}")
         }
 
-        // 4. Initialize and boot the hardware-accelerated Linux VM (AVF)
-        vmManager = VmManager(this)
-        vmManager.startLiteLinuxVm()
-
-        // 5. Initialize the Broker & start native engine
+        // 4. Initialize the Broker & start native engine
         broker = Broker(terminalSurface)
         broker.start()
+
+        // 5. Initialize and boot the hardware-accelerated Linux VM (AVF)
+        vmManager = VmManager(this)
+        vmManager.startLiteLinuxVm(broker)
 
         // 5. Setup Input Listeners
         btnSend.setOnClickListener {

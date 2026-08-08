@@ -7,10 +7,12 @@ use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
 pub mod local_pty;
+pub mod storage;
 pub mod vm_bridge;
 pub mod wasm_engine;
 
 use local_pty::LocalPty;
+use storage::StorageProvisioner;
 
 // Default AVF Guest VM Context ID and Port
 const DEFAULT_VM_CID: u32 = 3;
@@ -166,6 +168,44 @@ pub extern "system" fn Java_com_hybridengine_terminal_Broker_sendCommand(
         });
     } else {
         eprintln!("⚠️ [JNI] Broker not initialized. Call startDaemon first.");
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_hybridengine_terminal_Broker_provisionDiskNative(
+    env: JNIEnv,
+    class: JClass,
+    disk_path: JString,
+    rootfs_dir: JString,
+) {
+    Java_com_hybridengine_terminal_Broker_provisionDisk(env, class, disk_path, rootfs_dir);
+}
+
+#[no_mangle]
+pub extern "system" fn Java_com_hybridengine_terminal_Broker_provisionDisk(
+    mut env: JNIEnv,
+    _class: JClass,
+    disk_path: JString,
+    rootfs_dir: JString,
+) {
+    let disk: String = match env.get_string(&disk_path) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            eprintln!("❌ [JNI Error] Invalid disk path: {}", e);
+            return;
+        }
+    };
+    let rootfs: String = match env.get_string(&rootfs_dir) {
+        Ok(s) => s.into(),
+        Err(e) => {
+            eprintln!("❌ [JNI Error] Invalid rootfs path: {}", e);
+            return;
+        }
+    };
+
+    // Provision a 2GB (2048MB) virtual disk for Debian
+    if let Err(e) = StorageProvisioner::provision_avf_disk(&disk, &rootfs, 2048) {
+        eprintln!("❌ [JNI Error] Failed to provision AVF disk: {}", e);
     }
 }
 

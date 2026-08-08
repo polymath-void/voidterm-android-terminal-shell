@@ -48,8 +48,22 @@ class Broker(private val terminalView: TerminalSurfaceView) {
         }
     }
 
+    fun provisionDisk(diskPath: String, rootfsDir: String) {
+        if (isNativeLoaded) {
+            try {
+                provisionDiskNative(diskPath, rootfsDir)
+            } catch (e: Throwable) {
+                Log.e("VoidTerm", "Error provisioning disk: ${e.message}", e)
+            }
+        } else {
+            Log.w("VoidTerm", "Cannot provision disk: native broker library not loaded.")
+        }
+    }
+
     private external fun startDaemon()
     private external fun sendCommand(command: String)
+    @Suppress("FunctionName")
+    private external fun provisionDiskNative(diskPath: String, rootfsDir: String)
 
     fun onTerminalOutput(output: String) {
         terminalView.appendOutput(output)

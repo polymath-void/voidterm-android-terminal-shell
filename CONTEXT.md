@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 18:22 UTC  
+> **Last Synchronized**: 2026-08-08 18:34 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 18:34 UTC** `[AVF_GUEST]` **Implemented Priority 1: AVF Disk Formatting & Rootfs Provisioner**
+  - **Details**: Created `StorageProvisioner` in `hybrid-term-broker/src/storage.rs` to allocate 2GB sparse virtual disk (`disk.img`), format as ext4 using Android `/system/bin/mke2fs`, and inject Debian rootfs using `/system/bin/e2fsdroid` without root. Exposed JNI method `provisionDisk` in `lib.rs` and `Broker.kt`. Integrated custom disk image mounting in `VmManager.kt` and wired into `MainActivity.kt`. Packaged updated release `libhybrid_term_broker.so`.
+  - **Impacted Components**: [hybrid-term-broker/src/storage.rs](file:///data/data/com.termux/files/home/hybrid-engine/hybrid-term-broker/src/storage.rs), [hybrid-term-broker/src/lib.rs](file:///data/data/com.termux/files/home/hybrid-engine/hybrid-term-broker/src/lib.rs), [android/app/src/main/kotlin/com/hybridengine/terminal/Broker.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/Broker.kt), [android/app/src/main/kotlin/com/hybridengine/terminal/VmManager.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/VmManager.kt), [android/app/src/main/kotlin/com/hybridengine/terminal/MainActivity.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/MainActivity.kt), `android/app/src/main/jniLibs/arm64-v8a/libhybrid_term_broker.so`, [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Verified & Packaged.
 
 - **2026-08-08 18:22 UTC** `[AVF_GUEST]` **Configured CI Debian Rootfs Injector & First-Boot OsInstaller**
   - **Details**: Updated `.github/workflows/ci.yml` to automatically pull official Debian Bookworm arm64 rootfs and bundle it into `android/app/src/main/assets/debian-rootfs.tar.xz`. Implemented `OsInstaller.kt` to unpack and stage the Debian Linux image into internal storage on first boot, wired prior to `VmManager` and `Broker` startup.

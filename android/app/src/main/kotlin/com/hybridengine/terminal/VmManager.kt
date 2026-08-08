@@ -2,12 +2,13 @@ package com.hybridengine.terminal
 
 import android.content.Context
 import android.util.Log
+import java.io.File
 
 class VmManager(private val context: Context) {
 
     private var virtualMachineInstance: Any? = null
 
-    fun startLiteLinuxVm() {
+    fun startLiteLinuxVm(broker: Broker? = null) {
         try {
             Log.d("VoidTerm-AVF", "Checking Android Virtualization Framework (AVF) availability...")
 
@@ -27,7 +28,17 @@ class VmManager(private val context: Context) {
                 return
             }
 
-            Log.d("VoidTerm-AVF", "Configuring Lite Linux microVM (512MB RAM, match host CPU)...")
+            // Define paths
+            val rootfsDir = File(context.filesDir, "debian_rootfs")
+            val diskImage = File(context.filesDir, "disk.img")
+
+            Log.d("VoidTerm-AVF", "Configuring Debian MicroVM Topology...")
+
+            // 1. Trigger the Rust JNI bridge to format and inject the disk (if it doesn't exist)
+            if (!diskImage.exists() && broker != null) {
+                Log.i("VoidTerm-AVF", "Triggering Rust disk provisioner for ${diskImage.absolutePath}...")
+                broker.provisionDisk(diskImage.absolutePath, rootfsDir.absolutePath)
+            }
 
             val configBuilderClass = Class.forName("android.system.virtualmachine.VirtualMachineConfig\$Builder")
             val configBuilderConstructor = configBuilderClass.getConstructor(Context::class.java)
@@ -48,19 +59,35 @@ class VmManager(private val context: Context) {
                 setDebugLevelMethod.invoke(configBuilder, 2) // DEBUG_LEVEL_FULL
             } catch (_: Exception) {}
 
+            // 2. Construct Custom Linux Image payload for AVF if custom image config is supported
+            try {
+                val customConfigBuilderClass = Class.forName("android.system.virtualmachine.VirtualMachineCustomImageConfig\$Builder")
+                val customConfigBuilder = customConfigBuilderClass.getConstructor().newInstance()
+                val setDiskImageMethod = customConfigBuilderClass.getMethod("setDiskImage", File::class.java)
+                setDiskImageMethod.invoke(customConfigBuilder, diskImage)
+                val customBuildMethod = customConfigBuilderClass.getMethod("build")
+                val customImageConfig = customBuildMethod.invoke(customConfigBuilder)
+
+                val customImageConfigClass = Class.forName("android.system.virtualmachine.VirtualMachineCustomImageConfig")
+                val setCustomImageConfigMethod = configBuilderClass.getMethod("setCustomImageConfig", customImageConfigClass)
+                setCustomImageConfigMethod.invoke(configBuilder, customImageConfig)
+            } catch (e: Exception) {
+                Log.d("VoidTerm-AVF", "Standard microVM config mode: ${e.message}")
+            }
+
             val buildMethod = configBuilderClass.getMethod("build")
             val config = buildMethod.invoke(configBuilder)
 
             // Retrieve or create VM
             val configClass = Class.forName("android.system.virtualmachine.VirtualMachineConfig")
             val getOrCreateMethod = vmManagerClass.getMethod("getOrCreate", String::class.java, configClass)
-            virtualMachineInstance = getOrCreateMethod.invoke(vmManager, "voidterm_lite_vm", config)
+            virtualMachineInstance = getOrCreateMethod.invoke(vmManager, "voidterm_debian_vm", config)
 
             // Boot the microVM
             if (virtualMachineInstance != null) {
                 val startMethod = virtualMachineInstance!!.javaClass.getMethod("start")
                 startMethod.invoke(virtualMachineInstance)
-                Log.d("VoidTerm-AVF", "✅ Lite Linux microVM booted successfully on CID 3.")
+                Log.d("VoidTerm-AVF", "✅ Debian MicroVM Booted via Custom Image Config on CID 3.")
             }
         } catch (e: Throwable) {
             Log.e("VoidTerm-AVF", "AVF microVM boot bypassed/failed: ${e.message}")
