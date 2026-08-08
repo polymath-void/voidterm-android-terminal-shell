@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 14:59 UTC  
+> **Last Synchronized**: 2026-08-08 15:06 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 15:06 UTC** `[BUILD_ENV]` **Configured Android Gradle Build System & CI Setup**
+  - **Details**: Authored root `settings.gradle.kts`, `build.gradle.kts`, and `android/app/build.gradle.kts` targeting Android SDK 34 / Java 17. Integrated `gradle/actions/setup-gradle@v3` into `.github/workflows/ci.yml` for automated APK build verification alongside Rust broker checks.
+  - **Impacted Components**: [settings.gradle.kts](file:///data/data/com.termux/files/home/hybrid-engine/settings.gradle.kts), [build.gradle.kts](file:///data/data/com.termux/files/home/hybrid-engine/build.gradle.kts), [android/app/build.gradle.kts](file:///data/data/com.termux/files/home/hybrid-engine/android/app/build.gradle.kts), [.github/workflows/ci.yml](file:///data/data/com.termux/files/home/hybrid-engine/.github/workflows/ci.yml), [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Configured & Deployed.
 
 - **2026-08-08 14:59 UTC** `[REFACTOR]` **Consolidated Architectural Documentation & Removed Redundant core.md**
   - **Details**: Eliminated duplicate documentation by removing `core.md` and designating `CONTEXT.md` as the single canonical source of truth for living architecture, subsystem specifications, and event logs. Updated `AGENTS.md`, `README.md`, and workspace tree references.
