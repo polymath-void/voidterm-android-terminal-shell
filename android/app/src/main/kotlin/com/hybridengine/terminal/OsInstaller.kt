@@ -9,7 +9,7 @@ class OsInstaller(private val context: Context) {
 
     fun installIfNeeded() {
         val rootfsDir = File(context.filesDir, "debian_rootfs")
-        val archiveFile = File(context.filesDir, "debian-rootfs.tar.xz")
+        val archiveFile = File(context.filesDir, "debian-rootfs.tar.gz")
 
         // If the directory already exists, the OS is already installed
         if (rootfsDir.exists() && rootfsDir.isDirectory && (rootfsDir.list()?.isNotEmpty() == true)) {
@@ -22,15 +22,15 @@ class OsInstaller(private val context: Context) {
         try {
             // Check if the asset exists
             val assetList = context.assets.list("") ?: emptyArray()
-            if (!assetList.contains("debian-rootfs.tar.xz")) {
-                Log.i("VoidTerm-Installer", "No bundled debian-rootfs.tar.xz found in assets. Skipping auto-extraction.")
+            if (!assetList.contains("debian-rootfs.tar.gz")) {
+                Log.i("VoidTerm-Installer", "No bundled debian-rootfs.tar.gz found in assets. Skipping auto-extraction.")
                 return
             }
 
             Log.d("VoidTerm-Installer", "First boot detected. Unpacking Debian rootfs...")
 
             // 1. Copy the tarball from the APK assets to internal storage
-            context.assets.open("debian-rootfs.tar.xz").use { inputStream ->
+            context.assets.open("debian-rootfs.tar.gz").use { inputStream ->
                 FileOutputStream(archiveFile).use { outputStream ->
                     inputStream.copyTo(outputStream)
                 }

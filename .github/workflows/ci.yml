@@ -53,17 +53,17 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Fetch Official Debian Minimal Rootfs
+      - name: Fetch Official Debian Minimal Rootfs (.tar.gz)
         run: |
           # Create the Android assets directory if it doesn't exist
           mkdir -p android/app/src/main/assets/
           
-          # Download the official Debian 12 (Bookworm) rootfs tarball
-          echo "Downloading Debian Bookworm rootfs..."
-          curl -L -o android/app/src/main/assets/debian-rootfs.tar.xz \
-            https://github.com/debuerreotype/docker-debian-artifacts/raw/dist-arm64v8/bookworm/rootfs.tar.xz
+          # Download the official Debian 12 (Bookworm) ARM64 rootfs tarball (.tar.gz)
+          echo "Downloading Debian Bookworm ARM64 rootfs..."
+          curl -fL -o android/app/src/main/assets/debian-rootfs.tar.gz \
+            https://raw.githubusercontent.com/debuerreotype/docker-debian-artifacts/dist-arm64v8/bookworm/slim/oci/blobs/rootfs.tar.gz
           
-          echo "Rootfs fetched successfully."
+          echo "Rootfs fetched successfully: $(ls -lh android/app/src/main/assets/debian-rootfs.tar.gz)"
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4

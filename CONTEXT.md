@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 18:53 UTC  
+> **Last Synchronized**: 2026-08-08 20:38 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 20:38 UTC** `[AVF_GUEST]` **Integrated Native Gzip Tar Extraction & CI/CD Rootfs Fetch Fix**
+  - **Details**: Updated `.github/workflows/ci.yml` to fetch official Debian 12 Bookworm ARM64 `.tar.gz` rootfs with `-fL` fail-fast validation. Updated `OsInstaller.kt` to stage `debian-rootfs.tar.gz` into internal storage. Implemented native Android `/system/bin/tar` extraction in `StorageProvisioner::provision_avf_disk` (`storage.rs`) to decompress rootfs directly into `rootfs_dir` before ext4 formatting and rootfs packing, and cleaned up temporary archive. Built and packaged updated release `libhybrid_term_broker.so`.
+  - **Impacted Components**: [.github/workflows/ci.yml](file:///data/data/com.termux/files/home/hybrid-engine/.github/workflows/ci.yml), [android/app/src/main/kotlin/com/hybridengine/terminal/OsInstaller.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/OsInstaller.kt), [hybrid-term-broker/src/storage.rs](file:///data/data/com.termux/files/home/hybrid-engine/hybrid-term-broker/src/storage.rs), `android/app/src/main/jniLibs/arm64-v8a/libhybrid_term_broker.so`, [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Verified & Packaged.
 
 - **2026-08-08 18:53 UTC** `[TERMINAL_UI]` **Implemented Priority 3: ANSI Escape Sequence Parsing & Color Rendering**
   - **Details**: Created `AnsiParser.kt` in `com.hybridengine.terminal` supporting full ANSI 3/4-bit and high-intensity foreground color palettes, text formatting (bold, reset), carriage return sanitization, and backspace simulation. Integrated `AnsiParser` into `TerminalSurfaceView.kt` with thread-safe multi-segment X-axis paint rendering and bounded scrollback buffer (1000 lines).

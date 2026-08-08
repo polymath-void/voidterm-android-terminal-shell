@@ -37,6 +37,40 @@ impl StorageProvisioner {
 
         let rootfs = Path::new(rootfs_dir);
 
+        // Extract debian-rootfs.tar.gz using native Android tar if staged
+        let parent_dir = rootfs.parent().unwrap_or(rootfs);
+        let archive_path = parent_dir.join("debian-rootfs.tar.gz");
+
+        if archive_path.exists() {
+            println!("📦 [Storage] Extracting Debian OS using native Android tar from {}...", archive_path.display());
+            fs::create_dir_all(rootfs).context("Failed to create rootfs directory")?;
+
+            let tar_bin = if Path::new("/system/bin/tar").exists() {
+                "/system/bin/tar"
+            } else if Path::new("/data/data/com.termux/files/usr/bin/tar").exists() {
+                "/data/data/com.termux/files/usr/bin/tar"
+            } else {
+                "tar"
+            };
+
+            let tar_status = Command::new(tar_bin)
+                .arg("-xzf")
+                .arg(&archive_path)
+                .arg("-C")
+                .arg(rootfs_dir)
+                .status()
+                .context("Failed to execute native tar extractor")?;
+
+            if !tar_status.success() {
+                anyhow::bail!("Native tar extraction failed with exit code {:?}", tar_status.code());
+            }
+
+            println!("✅ [Storage] Debian rootfs extracted successfully.");
+
+            // Clean up archive to reclaim internal storage space
+            let _ = fs::remove_file(&archive_path);
+        }
+
         // 1. Inject guest daemon systemd unit & activation symlink into rootfs before packing
         Self::inject_systemd_service(rootfs)?;
 
