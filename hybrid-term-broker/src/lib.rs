@@ -11,7 +11,6 @@ pub mod storage;
 pub mod vm_bridge;
 pub mod wasm_engine;
 
-use local_pty::LocalPty;
 use storage::StorageProvisioner;
 
 // Default AVF Guest VM Context ID and Port
@@ -60,17 +59,7 @@ pub extern "system" fn Java_com_hybridengine_terminal_Broker_startDaemon(
     let _ = TX_INPUT.set(tx_input);
 
     rt.spawn(async move {
-        println!("🚀 [JNI] VoidTerm Broker daemon running...");
-        
-        // 1. Boot the persistent local PTY shell
-        let local_shell = match LocalPty::start(tx_output.clone()) {
-            Ok(pty) => Some(pty),
-            Err(e) => {
-                let err_msg = format!("❌ [Local PTY Error]: {}\n", e);
-                let _ = tx_output.send(IpcMessage::TerminalOutput(err_msg)).await;
-                None
-            }
-        };
+        println!("🚀 [JNI] VoidTerm Broker daemon running (Debian microVM direct vsock routing)...");
 
         // Spawn a parallel task to handle EGRESS (Rust -> Kotlin UI)
         tokio::spawn(async move {
@@ -81,21 +70,10 @@ pub extern "system" fn Java_com_hybridengine_terminal_Broker_startDaemon(
             }
         });
 
-        // 2. The INGRESS loop (Kotlin UI -> Rust)
+        // The INGRESS loop (Kotlin UI -> Rust -> Debian VM vsock)
         while let Some(msg) = rx_input.recv().await {
             match msg {
-                IpcMessage::ExecuteLocal { command } => {
-                    if let Some(ref pty) = local_shell {
-                        if let Err(e) = pty.write_command(&command) {
-                            let err_msg = format!("❌ [PTY Error]: {}\n", e);
-                            let _ = tx_output.send(IpcMessage::TerminalOutput(err_msg)).await;
-                        }
-                    } else {
-                        let err_msg = "❌ [PTY Error]: Shell session is not available.\n".to_string();
-                        let _ = tx_output.send(IpcMessage::TerminalOutput(err_msg)).await;
-                    }
-                }
-                IpcMessage::ExecuteVm { command } => {
+                IpcMessage::ExecuteLocal { command } | IpcMessage::ExecuteVm { command } => {
                     let tx_clone = tx_output.clone();
                     tokio::spawn(async move {
                         if let Err(e) = vm_bridge::VmBridge::dispatch_command(

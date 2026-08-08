@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 20:38 UTC  
+> **Last Synchronized**: 2026-08-08 20:57 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 20:57 UTC** `[ARCHITECTURE]` **Enforced MicroVM Boot Order, Purged Host Shell, and Upgraded UI Surface**
+  - **Details**: (1) Fixed boot sequence in `MainActivity.kt` ensuring `OsInstaller.installIfNeeded()` executes first, `VmManager.startLiteLinuxVm()` second, and `Broker` initialization last. (2) Purged `LocalPty::start` from `hybrid-term-broker` (`lib.rs` and `main.rs`), routing all terminal commands exclusively to `VmBridge` over vsock (CID 3, Port 8000). (3) Upgraded `TerminalSurfaceView.kt` with `ScaleGestureDetector` pinch-to-zoom (clamped 20f-100f) and `StaticLayout` word wrapping for responsive, non-clipped multi-line rendering. Compiled and stripped updated `libhybrid_term_broker.so`.
+  - **Impacted Components**: [android/app/src/main/kotlin/com/hybridengine/terminal/MainActivity.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/MainActivity.kt), [hybrid-term-broker/src/lib.rs](file:///data/data/com.termux/files/home/hybrid-engine/hybrid-term-broker/src/lib.rs), [hybrid-term-broker/src/main.rs](file:///data/data/com.termux/files/home/hybrid-engine/hybrid-term-broker/src/main.rs), [android/app/src/main/kotlin/com/hybridengine/terminal/TerminalSurfaceView.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/TerminalSurfaceView.kt), `android/app/src/main/jniLibs/arm64-v8a/libhybrid_term_broker.so`, [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Implemented & Verified.
 
 - **2026-08-08 20:38 UTC** `[AVF_GUEST]` **Integrated Native Gzip Tar Extraction & CI/CD Rootfs Fetch Fix**
   - **Details**: Updated `.github/workflows/ci.yml` to fetch official Debian 12 Bookworm ARM64 `.tar.gz` rootfs with `-fL` fail-fast validation. Updated `OsInstaller.kt` to stage `debian-rootfs.tar.gz` into internal storage. Implemented native Android `/system/bin/tar` extraction in `StorageProvisioner::provision_avf_disk` (`storage.rs`) to decompress rootfs directly into `rootfs_dir` before ext4 formatting and rootfs packing, and cleaned up temporary archive. Built and packaged updated release `libhybrid_term_broker.so`.

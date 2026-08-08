@@ -37,20 +37,20 @@ class MainActivity : AppCompatActivity() {
         commandInput = findViewById(R.id.command_input)
         btnSend = findViewById(R.id.btn_send)
 
-        // 3. Extract bundled Debian rootfs if needed
+        // 3. Extract bundled Debian rootfs if needed (Step 1: OsInstaller first)
         try {
             OsInstaller(this).installIfNeeded()
         } catch (e: Exception) {
             Log.w("VoidTerm", "OsInstaller initialization notice: ${e.message}")
         }
 
-        // 4. Initialize the Broker & start native engine
+        // 4. Initialize and boot the hardware-accelerated Linux VM (AVF) (Step 2: VmManager second)
+        vmManager = VmManager(this)
+        vmManager.startLiteLinuxVm()
+
+        // 5. Initialize the Broker & start native engine (Step 3: Broker last)
         broker = Broker(terminalSurface)
         broker.start()
-
-        // 5. Initialize and boot the hardware-accelerated Linux VM (AVF)
-        vmManager = VmManager(this)
-        vmManager.startLiteLinuxVm(broker)
 
         // 5. Setup Input Listeners
         btnSend.setOnClickListener {
