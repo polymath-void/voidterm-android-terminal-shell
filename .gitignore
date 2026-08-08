@@ -15,3 +15,8 @@ local.properties
 
 # NDK / JNI specific
 .cxx/
+
+# Downloaded CI Artifacts
+/dist/
+*.tar.gz
+*.apk
