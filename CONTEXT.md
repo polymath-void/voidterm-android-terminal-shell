@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 14:49 UTC  
+> **Last Synchronized**: 2026-08-08 14:52 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -116,6 +116,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 14:52 UTC** `[BUILD_ENV]` **Activated GitHub Actions CI Workflow on Git Push**
+  - **Details**: Configured direct SSH transport with GitHub (`git@ssh.github.com:polymath-void/voidterm-android-terminal-shell.git`), staged and pushed `.github/workflows/ci.yml`. Verified live automated execution of the CI workflow pipeline on push event.
+  - **Impacted Components**: [.github/workflows/ci.yml](file:///data/data/com.termux/files/home/hybrid-engine/.github/workflows/ci.yml), [.git/config](file:///data/data/com.termux/files/home/hybrid-engine/.git/config), [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Deployed & Triggered.
 
 - **2026-08-08 14:49 UTC** `[TEST_BENCH]` **Completed Native Rust Broker & Guest Daemon Build Verification**
   - **Details**: Resolved runtime dependencies and socket signatures for `aarch64-linux-android` compilation: transitioned WASM engine to zero-dependency pure-Rust `wasmi`, updated `tokio-vsock` `VsockAddr` signatures, and decoupled `tokio::select!` I/O buffers in `guest_daemon.rs`. Successfully compiled `cargo check` (0.42s) and built debug targets (`hybrid-term-broker`, `guest_daemon`, `libhybrid_term_broker.so`) in 1m 21s.
