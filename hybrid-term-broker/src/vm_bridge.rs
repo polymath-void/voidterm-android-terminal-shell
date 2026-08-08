@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
-use tokio_vsock::VsockStream;
+use tokio_vsock::{VsockAddr, VsockStream};
 
 use crate::IpcMessage;
 
@@ -23,7 +23,8 @@ impl VmBridge {
         let _ = tx_output.send(IpcMessage::TerminalOutput(init_msg)).await;
 
         // Connect to the guest Linux daemon listening on vsock (Port 8000)
-        let mut stream = VsockStream::connect(guest_cid, port)
+        let addr = VsockAddr::new(guest_cid, port);
+        let mut stream = VsockStream::connect(addr)
             .await
             .context("Failed to establish vsock connection to AVF guest VM")?;
 

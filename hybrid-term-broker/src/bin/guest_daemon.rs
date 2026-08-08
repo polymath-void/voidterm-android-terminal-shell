@@ -1,8 +1,9 @@
 use anyhow::{Context, Result};
+use std::net::Shutdown;
 use std::process::Stdio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::process::Command;
-use tokio_vsock::{VsockListener, VMADDR_CID_ANY};
+use tokio_vsock::{VsockAddr, VsockListener, VMADDR_CID_ANY};
 
 const VM_VSOCK_PORT: u32 = 8000;
 
@@ -11,7 +12,8 @@ async fn main() -> Result<()> {
     println!("🐧 [Guest Daemon] Booting inside AVF microVM...");
     
     // Bind the listener to all available CIDs on the guest side
-    let mut listener = VsockListener::bind(VMADDR_CID_ANY, VM_VSOCK_PORT)
+    let addr = VsockAddr::new(VMADDR_CID_ANY, VM_VSOCK_PORT);
+    let listener = VsockListener::bind(addr)
         .context("Failed to bind vsock listener")?;
 
     println!("🎧 [Guest Daemon] Listening on vsock port {}...", VM_VSOCK_PORT);
@@ -57,24 +59,25 @@ async fn main() -> Result<()> {
             let mut stdout = child.stdout.take().expect("Failed to capture stdout");
             let mut stderr = child.stderr.take().expect("Failed to capture stderr");
 
-            let mut output_buffer = [0u8; 1024];
+            let mut stdout_buffer = [0u8; 1024];
+            let mut stderr_buffer = [0u8; 1024];
 
             // 4. Stream the stdout back over vsock to the Host Broker
             loop {
                 tokio::select! {
-                    Ok(n) = stdout.read(&mut output_buffer) => {
+                    Ok(n) = stdout.read(&mut stdout_buffer) => {
                         if n == 0 { break; }
-                        let _ = stream.write_all(&output_buffer[..n]).await;
+                        let _ = stream.write_all(&stdout_buffer[..n]).await;
                     }
-                    Ok(n) = stderr.read(&mut output_buffer) => {
+                    Ok(n) = stderr.read(&mut stderr_buffer) => {
                         if n == 0 { break; }
-                        let _ = stream.write_all(&output_buffer[..n]).await;
+                        let _ = stream.write_all(&stderr_buffer[..n]).await;
                     }
                     else => break,
                 }
             }
             
-            let _ = stream.shutdown().await;
+            let _ = stream.shutdown(Shutdown::Both);
             println!("✅ [Guest Daemon] Execution complete. Stream closed.");
         });
     }

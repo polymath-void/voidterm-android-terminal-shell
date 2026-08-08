@@ -32,7 +32,7 @@ static TX_INPUT: OnceLock<mpsc::Sender<IpcMessage>> = OnceLock::new();
 
 #[no_mangle]
 pub extern "system" fn Java_com_hybridengine_terminal_Broker_startDaemon(
-    mut env: JNIEnv,
+    env: JNIEnv,
     obj: JObject, // Capture the calling Kotlin object instance
 ) {
     // 1. Capture the JavaVM and create a Global Reference to the Kotlin object
