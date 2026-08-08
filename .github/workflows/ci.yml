@@ -8,31 +8,61 @@ on:
 
 jobs:
   build-rust:
-    name: Rust IPC Broker Check
+    name: Rust IPC Broker Build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Rust toolchain
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install Rust Toolchain (aarch64-linux-android)
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-linux-android
-      - name: Cargo Check
-        run: cd hybrid-term-broker && cargo check
+
+      - name: Cargo Check & Build
+        run: |
+          cd hybrid-term-broker
+          cargo check --target aarch64-linux-android
+          cargo build --target aarch64-linux-android
+
+      - name: Upload Rust Binaries Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voidterm-rust-aarch64-binaries
+          path: |
+            **/target/**/hybrid-term-broker
+            **/target/**/guest_daemon
+            **/target/**/libhybrid_term_broker.so
+          if-no-files-found: warn
 
   build-android:
     name: Android APK Build
     runs-on: ubuntu-latest
     needs: build-rust
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
       - name: Set up JDK 17
         uses: actions/setup-java@v3
         with:
           java-version: '17'
           distribution: 'temurin'
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-      - name: Setup Gradle
+
+      - name: Setup Gradle 8.6
         uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.6'
+
       - name: Build Debug APK
-        run: gradle assembleDebug
+        run: gradle assembleDebug --stacktrace
+
+      - name: Upload Debug APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voidterm-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn

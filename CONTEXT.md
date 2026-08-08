@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 15:06 UTC  
+> **Last Synchronized**: 2026-08-08 15:13 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 15:13 UTC** `[BUILD_ENV]` **Pinned Gradle 8.6 & Added Cloud CI Artifact Uploads**
+  - **Details**: Resolved AGP 8.2.2 compatibility by pinning Gradle 8.6 in `.github/workflows/ci.yml`. Added `gradle.properties` JVM args and configured automated multi-artifact packaging (`actions/upload-artifact@v4`) for both native Rust AArch64 binaries and Android Debug APKs.
+  - **Impacted Components**: [.github/workflows/ci.yml](file:///data/data/com.termux/files/home/hybrid-engine/.github/workflows/ci.yml), [gradle.properties](file:///data/data/com.termux/files/home/hybrid-engine/gradle.properties), [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Configured & Pushed.
 
 - **2026-08-08 15:06 UTC** `[BUILD_ENV]` **Configured Android Gradle Build System & CI Setup**
   - **Details**: Authored root `settings.gradle.kts`, `build.gradle.kts`, and `android/app/build.gradle.kts` targeting Android SDK 34 / Java 17. Integrated `gradle/actions/setup-gradle@v3` into `.github/workflows/ci.yml` for automated APK build verification alongside Rust broker checks.
