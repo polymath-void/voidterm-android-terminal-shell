@@ -7,10 +7,6 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import android.util.Log
-import android.view.KeyEvent
-import android.view.inputmethod.EditorInfo
-import android.widget.Button
-import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
@@ -18,8 +14,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var terminalSurface: TerminalSurfaceView
     private lateinit var broker: Broker
     private lateinit var vmManager: VmManager
-    private lateinit var commandInput: EditText
-    private lateinit var btnSend: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,10 +26,8 @@ class MainActivity : AppCompatActivity() {
             Log.w("VoidTerm", "Storage permission request error: ${e.message}")
         }
 
-        // 2. Initialize Views
+        // 2. Initialize Fullscreen Terminal View
         terminalSurface = findViewById(R.id.terminal_surface)
-        commandInput = findViewById(R.id.command_input)
-        btnSend = findViewById(R.id.btn_send)
 
         // 3. Extract bundled Debian rootfs if needed (Step 1: OsInstaller first)
         try {
@@ -52,18 +44,11 @@ class MainActivity : AppCompatActivity() {
         broker = Broker(terminalSurface)
         broker.start()
 
-        // 5. Setup Input Listeners
-        btnSend.setOnClickListener {
-            dispatchCommand()
-        }
-
-        commandInput.setOnEditorActionListener { _, actionId, event ->
-            if (actionId == EditorInfo.IME_ACTION_SEND || 
-                (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)) {
-                dispatchCommand()
-                true
-            } else {
-                false
+        // 6. Connect Native Inline Terminal Input directly to the Broker
+        terminalSurface.onCommandSubmitted = { command ->
+            val trimmed = command.trim()
+            if (trimmed.isNotEmpty()) {
+                broker.send(trimmed)
             }
         }
     }
@@ -91,17 +76,6 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
-        }
-    }
-
-    private fun dispatchCommand() {
-        val command = commandInput.text.toString().trim()
-        if (command.isNotEmpty()) {
-            // Push the command down through the broker
-            broker.send(command)
-            
-            // Clear the input field
-            commandInput.text.clear()
         }
     }
 }
