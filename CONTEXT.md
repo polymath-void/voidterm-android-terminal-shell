@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 15:18 UTC  
+> **Last Synchronized**: 2026-08-08 15:23 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 15:23 UTC** `[BUILD_ENV]` **Resolved AAPT2 Manifest Resource Linking in Android Build**
+  - **Details**: Updated `AndroidManifest.xml` icon attributes to reference standard platform drawables (`@android:drawable/sym_def_app_icon`), eliminating AAPT2 missing mipmap resource errors during `gradle assembleDebug`.
+  - **Impacted Components**: [android/app/src/main/AndroidManifest.xml](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/AndroidManifest.xml), [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Fixed & Pushed.
 
 - **2026-08-08 15:18 UTC** `[BUILD_ENV]` **Refactored CI Pipeline for Cross-Target Verification & Cloud Packaging**
   - **Details**: Updated `.github/workflows/ci.yml` with dual verification: validating `aarch64-linux-android` target compilation via `cargo check` and building host binaries + unit tests, resolving linker architecture mismatches on generic Ubuntu runners.
