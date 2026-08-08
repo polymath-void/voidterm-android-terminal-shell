@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="Appearance"
+        app:iconSpaceReserved="false">
+
+        <ListPreference
+            android:key="theme"
+            android:title="Theme"
+            android:dialogTitle="Select Terminal Theme"
+            android:entries="@array/theme_entries"
+            android:entryValues="@array/theme_values"
+            android:defaultValue="DRACULA"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="font_size"
+            android:title="Font Size"
+            android:dialogTitle="Enter Font Size (20 - 100)"
+            android:defaultValue="38"
+            android:inputType="number"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="Cursor Settings"
+        app:iconSpaceReserved="false">
+
+        <ListPreference
+            android:key="cursor_style"
+            android:title="Cursor Style"
+            android:dialogTitle="Select Cursor Style"
+            android:entries="@array/cursor_style_entries"
+            android:entryValues="@array/cursor_style_values"
+            android:defaultValue="BLOCK"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:key="cursor_blink"
+            android:title="Cursor Blink"
+            android:summary="Enable 500ms cursor blink animation"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+</PreferenceScreen>

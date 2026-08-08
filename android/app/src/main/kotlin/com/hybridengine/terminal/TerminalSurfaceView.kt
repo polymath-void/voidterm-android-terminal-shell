@@ -100,6 +100,10 @@ class TerminalSurfaceView @JvmOverloads constructor(
         triggerRender()
     }
 
+    fun reloadConfig() {
+        applyConfig(TerminalConfig(context))
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         scaleGestureDetector.onTouchEvent(event)
 

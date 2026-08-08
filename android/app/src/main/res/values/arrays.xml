@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="theme_entries">
+        <item>Default (Dracula)</item>
+        <item>Dracula</item>
+        <item>Nord</item>
+        <item>Monokai</item>
+    </string-array>
+    <string-array name="theme_values">
+        <item>DRACULA</item>
+        <item>DRACULA</item>
+        <item>NORD</item>
+        <item>MONOKAI</item>
+    </string-array>
+
+    <string-array name="cursor_style_entries">
+        <item>Block (█)</item>
+        <item>Underline (_)</item>
+        <item>Bar (|)</item>
+    </string-array>
+    <string-array name="cursor_style_values">
+        <item>BLOCK</item>
+        <item>UNDERLINE</item>
+        <item>BAR</item>
+    </string-array>
+</resources>

@@ -53,6 +53,12 @@ class MainActivity : AppCompatActivity() {
         // 2. Initialize Fullscreen Terminal View
         terminalSurface = findViewById(R.id.terminal_surface)
 
+        // Wire FloatingActionButton to open SettingsActivity
+        findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.fab_settings)?.setOnClickListener {
+            val intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
+        }
+
         // 3. Start & Bind to Persistent TerminalService (manages VM and Broker lifecycle)
         TerminalService.start(this)
         val serviceIntent = Intent(this, TerminalService::class.java)
@@ -64,6 +70,13 @@ class MainActivity : AppCompatActivity() {
             if (trimmed.isNotEmpty()) {
                 terminalService?.broker?.send(trimmed)
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::terminalSurface.isInitialized) {
+            terminalSurface.reloadConfig()
         }
     }
 

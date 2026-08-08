@@ -91,16 +91,20 @@ enum class CursorStyle(val symbol: String) {
     }
 }
 
+import androidx.preference.PreferenceManager
+
 /**
- * Configuration manager backed by SharedPreferences.
+ * Configuration manager backed by PreferenceManager.getDefaultSharedPreferences.
  */
 class TerminalConfig(context: Context) {
 
-    private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
 
     var theme: TerminalTheme
         get() {
-            val raw = prefs.getString(KEY_THEME, TerminalTheme.DRACULA.name) ?: TerminalTheme.DRACULA.name
+            val raw = prefs.getString(KEY_THEME, null)
+                ?: prefs.getString(LEGACY_KEY_THEME, TerminalTheme.DRACULA.name)
+                ?: TerminalTheme.DRACULA.name
             return TerminalTheme.fromString(raw)
         }
         set(value) {
@@ -108,14 +112,32 @@ class TerminalConfig(context: Context) {
         }
 
     var fontSize: Float
-        get() = prefs.getFloat(KEY_FONT_SIZE, DEFAULT_FONT_SIZE)
+        get() {
+            val fromString = try {
+                prefs.getString(KEY_FONT_SIZE, null)?.toFloatOrNull()
+            } catch (_: Exception) {
+                null
+            }
+            if (fromString != null) return fromString.coerceIn(20f, 100f)
+
+            return try {
+                prefs.getFloat(KEY_FONT_SIZE, prefs.getFloat(LEGACY_KEY_FONT_SIZE, DEFAULT_FONT_SIZE))
+            } catch (_: Exception) {
+                DEFAULT_FONT_SIZE
+            }.coerceIn(20f, 100f)
+        }
         set(value) {
-            prefs.edit().putFloat(KEY_FONT_SIZE, value.coerceIn(20f, 100f)).apply()
+            prefs.edit()
+                .putFloat(KEY_FONT_SIZE, value.coerceIn(20f, 100f))
+                .putString(KEY_FONT_SIZE, value.coerceIn(20f, 100f).toInt().toString())
+                .apply()
         }
 
     var cursorStyle: CursorStyle
         get() {
-            val raw = prefs.getString(KEY_CURSOR_STYLE, CursorStyle.BLOCK.name) ?: CursorStyle.BLOCK.name
+            val raw = prefs.getString(KEY_CURSOR_STYLE, null)
+                ?: prefs.getString(LEGACY_KEY_CURSOR_STYLE, CursorStyle.BLOCK.name)
+                ?: CursorStyle.BLOCK.name
             return CursorStyle.fromString(raw)
         }
         set(value) {
@@ -123,17 +145,28 @@ class TerminalConfig(context: Context) {
         }
 
     var cursorBlink: Boolean
-        get() = prefs.getBoolean(KEY_CURSOR_BLINK, true)
+        get() {
+            return if (prefs.contains(KEY_CURSOR_BLINK)) {
+                prefs.getBoolean(KEY_CURSOR_BLINK, true)
+            } else {
+                prefs.getBoolean(LEGACY_KEY_CURSOR_BLINK, true)
+            }
+        }
         set(value) {
             prefs.edit().putBoolean(KEY_CURSOR_BLINK, value).apply()
         }
 
     companion object {
-        private const val PREFS_NAME = "voidterm_terminal_config"
-        private const val KEY_THEME = "terminal_theme"
-        private const val KEY_FONT_SIZE = "terminal_font_size"
-        private const val KEY_CURSOR_STYLE = "terminal_cursor_style"
-        private const val KEY_CURSOR_BLINK = "terminal_cursor_blink"
+        const val KEY_THEME = "theme"
+        const val KEY_FONT_SIZE = "font_size"
+        const val KEY_CURSOR_STYLE = "cursor_style"
+        const val KEY_CURSOR_BLINK = "cursor_blink"
+
+        private const val LEGACY_KEY_THEME = "terminal_theme"
+        private const val LEGACY_KEY_FONT_SIZE = "terminal_font_size"
+        private const val LEGACY_KEY_CURSOR_STYLE = "terminal_cursor_style"
+        private const val LEGACY_KEY_CURSOR_BLINK = "terminal_cursor_blink"
+
         const val DEFAULT_FONT_SIZE = 38f
     }
 }

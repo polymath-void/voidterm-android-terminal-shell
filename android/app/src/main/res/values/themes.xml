@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Base application theme without action bar -->
+    <style name="Theme.VoidTerm" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">#BD93F9</item>
+        <item name="colorPrimaryDark">#282A36</item>
+        <item name="colorAccent">#50FA7B</item>
+        <item name="android:windowBackground">#282A36</item>
+    </style>
+
+    <!-- Settings theme with standard ActionBar -->
+    <style name="Theme.VoidTerm.Settings" parent="Theme.AppCompat.DayNight.DarkActionBar">
+        <item name="colorPrimary">#282A36</item>
+        <item name="colorPrimaryDark">#1E1F29</item>
+        <item name="colorAccent">#50FA7B</item>
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+    </style>
+</resources>

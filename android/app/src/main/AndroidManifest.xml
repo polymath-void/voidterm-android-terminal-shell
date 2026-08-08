@@ -34,6 +34,13 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:label="Terminal Settings"
+            android:theme="@style/Theme.VoidTerm.Settings"
+            android:parentActivityName=".MainActivity" />
+
         <service
             android:name=".TerminalService"
             android:enabled="true"
