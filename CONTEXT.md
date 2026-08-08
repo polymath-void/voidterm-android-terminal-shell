@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 15:23 UTC  
+> **Last Synchronized**: 2026-08-08 15:29 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 15:29 UTC** `[BUILD_ENV]` **End-to-End Cloud CI Pipeline Fully Green (Rust + Android APK)**
+  - **Details**: Full CI/CD build run `31264349739` succeeded completely across all jobs (`Rust IPC Broker Build` and `Android APK Build`). Cloud workflow successfully produced and uploaded both `voidterm-debug-apk` and `voidterm-rust-binaries` artifacts.
+  - **Impacted Components**: [.github/workflows/ci.yml](file:///data/data/com.termux/files/home/hybrid-engine/.github/workflows/ci.yml), [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Verified & Succeeded (Green).
 
 - **2026-08-08 15:23 UTC** `[BUILD_ENV]` **Resolved AAPT2 Manifest Resource Linking in Android Build**
   - **Details**: Updated `AndroidManifest.xml` icon attributes to reference standard platform drawables (`@android:drawable/sym_def_app_icon`), eliminating AAPT2 missing mipmap resource errors during `gradle assembleDebug`.
