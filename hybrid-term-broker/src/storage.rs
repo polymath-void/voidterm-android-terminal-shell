@@ -164,8 +164,15 @@ impl StorageProvisioner {
 
         let dest_bin = bin_dir.join("guest_daemon");
         if !dest_bin.exists() {
-            // Search candidate locations for pre-built guest_daemon binary
+            let parent_dir = rootfs.parent().unwrap_or(rootfs);
+            let staged_guest_daemon = parent_dir.join("guest_daemon");
+
+            // Search candidate locations for pre-built musl static guest_daemon binary
             let candidates = [
+                staged_guest_daemon.as_path(),
+                Path::new("/data/data/com.hybridengine.terminal/files/guest_daemon"),
+                Path::new("target/aarch64-unknown-linux-musl/release/guest_daemon"),
+                Path::new("target/aarch64-unknown-linux-gnu/release/guest_daemon"),
                 Path::new("/data/data/com.termux/files/usr/bin/guest_daemon"),
                 Path::new("/data/local/tmp/guest_daemon"),
                 Path::new("target/release/guest_daemon"),
@@ -176,7 +183,7 @@ impl StorageProvisioner {
             for candidate in &candidates {
                 if candidate.exists() {
                     if let Ok(_) = fs::copy(candidate, &dest_bin) {
-                        println!("📥 [Storage] Copied guest_daemon from {}", candidate.display());
+                        println!("📥 [Storage] Copied static guest_daemon from {}", candidate.display());
                         copied = true;
                         break;
                     }

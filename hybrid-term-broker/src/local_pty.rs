@@ -8,10 +8,12 @@ use tokio::sync::mpsc;
 
 use crate::IpcMessage;
 
+#[allow(dead_code)]
 pub struct LocalPty {
     writer: Arc<Mutex<File>>,
 }
 
+#[allow(dead_code)]
 impl LocalPty {
     /// Spawns a persistent Android shell using native POSIX PTY and pipes output to the UI
     pub fn start(tx_output: mpsc::Sender<IpcMessage>) -> Result<Self> {

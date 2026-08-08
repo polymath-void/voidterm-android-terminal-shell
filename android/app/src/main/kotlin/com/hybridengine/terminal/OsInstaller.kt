@@ -36,10 +36,22 @@ class OsInstaller(private val context: Context) {
                 }
             }
 
-            // 2. Create the destination directory
+            // 2. Copy the static guest_daemon binary if bundled in assets
+            if (assetList.contains("guest_daemon")) {
+                val guestDaemonFile = File(context.filesDir, "guest_daemon")
+                context.assets.open("guest_daemon").use { inputStream ->
+                    FileOutputStream(guestDaemonFile).use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
+                }
+                guestDaemonFile.setExecutable(true, false)
+                Log.d("VoidTerm-Installer", "✅ Static guest_daemon staged at ${guestDaemonFile.absolutePath}")
+            }
+
+            // 3. Create the destination directory
             rootfsDir.mkdirs()
 
-            // 3. Extract the tarball (or prepare for guest microVM mount)
+            // 4. Extract the tarball (or prepare for guest microVM mount)
             Log.d("VoidTerm-Installer", "Archive staged at ${archiveFile.absolutePath} for AVF microVM.")
 
             Log.d("VoidTerm-Installer", "✅ Debian OS rootfs staged successfully.")

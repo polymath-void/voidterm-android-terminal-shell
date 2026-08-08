@@ -8,16 +8,16 @@ on:
 
 jobs:
   build-rust:
-    name: Rust IPC Broker Build
+    name: Rust IPC Broker & Guest Daemon Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
+      - name: Install Rust Musl Target & Cross Toolchain
+        run: |
+          sudo apt-get update && sudo apt-get install -y musl-tools gcc-aarch64-linux-gnu
+          rustup target add aarch64-unknown-linux-musl aarch64-linux-android
 
       - name: Cargo Check (aarch64-linux-android)
         run: |
@@ -29,6 +29,13 @@ jobs:
           cd hybrid-term-broker
           cargo check
           cargo test --lib
+
+      - name: Build Static Guest Daemon (musl for Debian)
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
+        run: |
+          cd hybrid-term-broker
+          cargo build --target aarch64-unknown-linux-musl --bin guest_daemon --release
 
       - name: Build Host Binaries
         run: |
@@ -53,11 +60,21 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Download Rust Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: voidterm-rust-binaries
+          path: rust-artifacts
+
+      - name: Stage Static Guest Daemon to Assets
+        run: |
+          mkdir -p android/app/src/main/assets/
+          find rust-artifacts -name "guest_daemon" -exec cp {} android/app/src/main/assets/guest_daemon \;
+          chmod +x android/app/src/main/assets/guest_daemon || true
+          ls -lh android/app/src/main/assets/
+
       - name: Fetch Official Debian Minimal Rootfs (.tar.gz)
         run: |
-          # Create the Android assets directory if it doesn't exist
-          mkdir -p android/app/src/main/assets/
-          
           # Download the official Debian 12 (Bookworm) ARM64 rootfs tarball (.tar.gz)
           echo "Downloading Debian Bookworm ARM64 rootfs..."
           curl -fL -o android/app/src/main/assets/debian-rootfs.tar.gz \
