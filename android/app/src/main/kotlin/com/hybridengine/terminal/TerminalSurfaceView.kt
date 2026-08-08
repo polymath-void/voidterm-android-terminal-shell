@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
-import android.graphics.Typeface
 import android.os.Build
 import android.util.AttributeSet
 import android.util.Log
@@ -20,35 +19,34 @@ class TerminalSurfaceView @JvmOverloads constructor(
     private var drawingThread: Thread? = null
     @Volatile
     private var isRunning = false
-    private val textBuffer = mutableListOf<String>()
-    
-    // Minimalist, hardware-native typography configuration
-    private val textPaint = Paint().apply {
-        color = Color.parseColor("#E0E0E0") // High-contrast off-white
-        textSize = 42f
-        typeface = Typeface.MONOSPACE
-        isAntiAlias = true
-    }
-    
+
+    private val ansiParser = AnsiParser()
+    private val terminalLines = mutableListOf<List<AnsiParser.StyledText>>()
+
     private val backgroundPaint = Paint().apply {
         color = Color.parseColor("#0A0A0A") // Deep true black
     }
+
+    private val lineHeight = 52f
 
     init {
         holder.addCallback(this)
     }
 
-    // Safely append new text from the Broker
-    fun appendOutput(text: String) {
-        synchronized(textBuffer) {
-            val lines = text.split("\n")
-            textBuffer.addAll(lines)
-            
-            // Keep buffer bounded
-            if (textBuffer.size > 500) {
-                textBuffer.subList(0, textBuffer.size - 500).clear()
+    /**
+     * Safely appends and parses new terminal output from the Broker.
+     */
+    fun appendOutput(rawOutput: String) {
+        val styledLines = ansiParser.parseLines(rawOutput)
+        synchronized(terminalLines) {
+            terminalLines.addAll(styledLines)
+
+            // Bound memory buffer to 1000 lines
+            if (terminalLines.size > 1000) {
+                terminalLines.subList(0, terminalLines.size - 1000).clear()
             }
         }
+        triggerRender()
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
@@ -56,7 +54,9 @@ class TerminalSurfaceView @JvmOverloads constructor(
         drawingThread = Thread(this, "VoidTerm-Renderer").apply { start() }
     }
 
-    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
+    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+        triggerRender()
+    }
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         isRunning = false
@@ -76,49 +76,79 @@ class TerminalSurfaceView @JvmOverloads constructor(
                 continue
             }
 
-            var canvas: Canvas? = null
-            try {
-                canvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    try {
-                        holder.lockHardwareCanvas()
-                    } catch (_: Exception) {
-                        holder.lockCanvas()
-                    }
-                } else {
-                    holder.lockCanvas()
-                }
+            renderFrame()
 
-                if (canvas != null) {
-                    drawTerminal(canvas)
-                }
-            } catch (e: Exception) {
-                Log.e("VoidTerm", "Error drawing frame: ${e.message}")
-            } finally {
-                if (canvas != null) {
-                    try {
-                        holder.unlockCanvasAndPost(canvas)
-                    } catch (e: Exception) {
-                        Log.e("VoidTerm", "Error posting canvas: ${e.message}")
-                    }
-                }
-            }
-            
             try {
-                Thread.sleep(16) // ~60fps
+                Thread.sleep(16) // ~60fps rendering cadence
             } catch (_: Exception) {}
         }
     }
 
+    private fun triggerRender() {
+        if (holder.surface.isValid) {
+            renderFrame()
+        }
+    }
+
+    private fun renderFrame() {
+        var canvas: Canvas? = null
+        try {
+            canvas = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                try {
+                    holder.lockHardwareCanvas()
+                } catch (_: Exception) {
+                    holder.lockCanvas()
+                }
+            } else {
+                holder.lockCanvas()
+            }
+
+            if (canvas != null) {
+                drawTerminal(canvas)
+            }
+        } catch (e: Exception) {
+            Log.e("VoidTerm", "Error drawing frame: ${e.message}")
+        } finally {
+            if (canvas != null) {
+                try {
+                    holder.unlockCanvasAndPost(canvas)
+                } catch (e: Exception) {
+                    Log.e("VoidTerm", "Error posting canvas: ${e.message}")
+                }
+            }
+        }
+    }
+
     private fun drawTerminal(canvas: Canvas) {
+        // 1. Draw solid background
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
 
-        synchronized(textBuffer) {
-            var yOffset = height.toFloat() - 50f
-            
-            for (i in textBuffer.indices.reversed()) {
-                if (yOffset < 0) break
-                canvas.drawText(textBuffer[i], 20f, yOffset, textPaint)
-                yOffset -= (textPaint.textSize + 10f)
+        synchronized(terminalLines) {
+            val totalLines = terminalLines.size
+            if (totalLines == 0) return
+
+            val maxVisibleLines = ((height.toFloat() - 40f) / lineHeight).toInt().coerceAtLeast(1)
+            val visibleLines = if (totalLines > maxVisibleLines) {
+                terminalLines.subList(totalLines - maxVisibleLines, totalLines)
+            } else {
+                terminalLines
+            }
+
+            var yOffset = 50f
+            val startX = 20f
+
+            // Render each visible line sequentially
+            for (lineBlocks in visibleLines) {
+                var xOffset = startX
+
+                // Render each styled text segment across the X axis
+                for (block in lineBlocks) {
+                    if (block.text.isNotEmpty()) {
+                        canvas.drawText(block.text, xOffset, yOffset, block.paint)
+                        xOffset += block.paint.measureText(block.text)
+                    }
+                }
+                yOffset += lineHeight
             }
         }
     }
