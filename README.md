@@ -1,8 +1,26 @@
 # VoidTerm Shell Terminal
 
-[![VoidTerm CI](https://github.com/polymath-void/voidterm-android-terminal-shell/actions/workflows/ci.yml/badge.svg)](https://github.com/polymath-void/voidterm-android-terminal-shell/actions/workflows/ci.yml)
+<p align="center">
+  <img src="assets/banner.jpg" alt="VoidTerm Shell Terminal" width="100%" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Android_NDK_%26_AVF-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android" />
+  <img src="https://img.shields.io/badge/Rust-Tokio_Async-DEA584?style=for-the-badge&logo=rust&logoColor=white" alt="Rust" />
+  <img src="https://img.shields.io/badge/WASM-WasmEdge_Host-654FF0?style=for-the-badge&logo=webassembly&logoColor=white" alt="WebAssembly" />
+  <img src="https://img.shields.io/badge/MicroVM-crosvm_virtio--vsock-4285F4?style=for-the-badge&logo=linux&logoColor=white" alt="Linux AVF" />
+  <img src="https://img.shields.io/badge/License-Apache_2.0-blue?style=for-the-badge" alt="License" />
+</p>
 
 **VoidTerm Shell Terminal** is a high-performance, dual-tier Android terminal and execution environment. It bridges ultra-low latency host-native execution with full Linux environment compatibility through a multi-tier architecture.
+
+---
+
+## 🏛️ System Architecture Topology
+
+<p align="center">
+  <img src="assets/architecture.svg" alt="VoidTerm Architecture Topology" width="100%" />
+</p>
 
 ```mermaid
 flowchart TD
@@ -65,6 +83,9 @@ flowchart TD
 
 ```
 .
+├── assets/                  # High-resolution banner & vector architecture SVG
+│   ├── banner.jpg
+│   └── architecture.svg
 ├── .github/workflows/ci.yml # Automated CI pipeline (Rust check & Android APK build)
 ├── .gitignore               # Unified Cargo and Gradle build exclusions
 ├── AGENTS.md                # Repository governance & operational directives
