@@ -1,7 +1,7 @@
 # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
 
 > **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-08-08 17:35 UTC  
+> **Last Synchronized**: 2026-08-08 18:22 UTC  
 > **Repository Root**: `/data/data/com.termux/files/home/hybrid-engine`
 
 ---
@@ -115,6 +115,11 @@ flowchart TD
 ## 5. Category-Based Event Log
 
 > **Protocol Reminder**: All modifications, architectural milestones, and test runs MUST be logged here using the strict categorization schema defined in `AGENTS.md`.
+
+- **2026-08-08 18:22 UTC** `[AVF_GUEST]` **Configured CI Debian Rootfs Injector & First-Boot OsInstaller**
+  - **Details**: Updated `.github/workflows/ci.yml` to automatically pull official Debian Bookworm arm64 rootfs and bundle it into `android/app/src/main/assets/debian-rootfs.tar.xz`. Implemented `OsInstaller.kt` to unpack and stage the Debian Linux image into internal storage on first boot, wired prior to `VmManager` and `Broker` startup.
+  - **Impacted Components**: [.github/workflows/ci.yml](file:///data/data/com.termux/files/home/hybrid-engine/.github/workflows/ci.yml), [android/app/src/main/kotlin/com/hybridengine/terminal/OsInstaller.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/OsInstaller.kt), [android/app/src/main/kotlin/com/hybridengine/terminal/MainActivity.kt](file:///data/data/com.termux/files/home/hybrid-engine/android/app/src/main/kotlin/com/hybridengine/terminal/MainActivity.kt), [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+  - **Outcome / Status**: Verified & Integrated.
 
 - **2026-08-08 17:35 UTC** `[AVF_GUEST]` **Integrated Phase 7 AVF Permissions & VirtualMachineManager Orchestrator**
   - **Details**: Added `android.permission.MANAGE_VIRTUAL_MACHINE` to `AndroidManifest.xml`. Implemented `VmManager.kt` with resilient `VirtualMachineManager` lifecycle management (512MB RAM allocation, host CPU topology, full debug logging, and graceful teardown on activity destruction). Wired `VmManager` into `MainActivity.kt` boot sequence.
