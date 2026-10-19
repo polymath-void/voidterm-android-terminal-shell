@@ -59,6 +59,31 @@ Expected output:
 [✔] ALL 7 AGENT CONTROL PLANE TESTS PASSED PERFECTLY!
 ```
 
+### 3.1 CLI Control via `void agent`
+
+You can also interact with the Agent Control Plane directly using the shortform `void` CLI:
+
+```bash
+# Check ACP socket status
+void agent ping
+
+# List active sessions
+void agent list
+
+# Create a dedicated agent session
+void agent create worker-1 --tier local --workdir ~/Projects
+
+# Dispatch command and inspect circular scrollback buffer
+void agent exec "cargo check" --session worker-1
+void agent snapshot --session worker-1 --lines 50
+
+# Broadcast real-time agent HUD telemetry directly to the Android UI
+void agent hud "Refactoring system core" --agent DeepCoder --status working --file lib.rs --progress 0.85
+
+# Close session
+void agent close worker-1
+```
+
 ---
 
 ## 4. Building the Android Application APK
