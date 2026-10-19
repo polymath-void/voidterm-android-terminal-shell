@@ -39,6 +39,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var textHudFile: TextView
     private lateinit var progressHud: ProgressBar
     private lateinit var btnHudDismiss: ImageView
+    private lateinit var fabVoice: com.google.android.material.floatingactionbutton.FloatingActionButton
+    private lateinit var voiceManager: VoiceManager
     private val hudDismissHandler = Handler(Looper.getMainLooper())
     private var hudDismissRunnable: Runnable? = null
 
@@ -73,7 +75,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 1. Request Runtime Permissions (Storage & Notifications)
+        // 1. Request Runtime Permissions (Storage, Notifications & Microphone)
         requestRequiredPermissions()
 
         // 2. Initialize Fullscreen Terminal View & HUD Overlay
@@ -85,6 +87,7 @@ class MainActivity : AppCompatActivity() {
         textHudFile = findViewById(R.id.text_hud_file)
         progressHud = findViewById(R.id.progress_hud)
         btnHudDismiss = findViewById(R.id.btn_hud_dismiss)
+        fabVoice = findViewById(R.id.fab_voice)
 
         btnHudDismiss.setOnClickListener {
             cardAgentHud.visibility = View.GONE
@@ -94,6 +97,72 @@ class MainActivity : AppCompatActivity() {
         findViewById<com.google.android.material.floatingactionbutton.FloatingActionButton>(R.id.fab_settings)?.setOnClickListener {
             val intent = Intent(this, SettingsActivity::class.java)
             startActivity(intent)
+        }
+
+        // Initialize Live Voice Interaction with Agent
+        voiceManager = VoiceManager(this).apply {
+            onListeningStateChanged = { listening ->
+                runOnUiThread {
+                    if (listening) {
+                        fabVoice.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#FF5555"))
+                        updateAgentHud(
+                            HudTelemetry(
+                                agent = "Voice Agent",
+                                status = "listening",
+                                thought = "🎙️ Listening to live voice command..."
+                            )
+                        )
+                    } else {
+                        fabVoice.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#6272A4"))
+                    }
+                }
+            }
+
+            onSpeechPartial = { partial ->
+                runOnUiThread {
+                    updateAgentHud(
+                        HudTelemetry(
+                            agent = "Live Voice Input",
+                            status = "listening",
+                            thought = "“$partial”"
+                        )
+                    )
+                }
+            }
+
+            onSpeechResult = { recognizedText ->
+                runOnUiThread {
+                    updateAgentHud(
+                        HudTelemetry(
+                            agent = "Voice Agent",
+                            status = "executing",
+                            thought = "Spoken Directive: \"$recognizedText\""
+                        )
+                    )
+                    // Submit spoken command directly to terminal broker
+                    terminalService?.broker?.send(recognizedText)
+                }
+            }
+
+            onSpeechError = { errorMsg ->
+                runOnUiThread {
+                    updateAgentHud(
+                        HudTelemetry(
+                            agent = "Voice Agent",
+                            status = "error",
+                            thought = errorMsg
+                        )
+                    )
+                }
+            }
+        }
+
+        fabVoice.setOnClickListener {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 102)
+            } else {
+                voiceManager.toggleListening()
+            }
         }
 
         // 3. Start & Bind to Persistent TerminalService (manages VM and Broker lifecycle)
@@ -186,6 +255,9 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         hudDismissRunnable?.let { hudDismissHandler.removeCallbacks(it) }
+        try {
+            voiceManager.destroy()
+        } catch (_: Exception) {}
         if (isBound) {
             terminalService?.broker?.outputListener = null
             terminalService?.broker?.hudTelemetryListener = null
@@ -195,6 +267,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestRequiredPermissions() {
+        // Microphone permission for live voice agent interaction
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 102)
+        }
+
         // Notification permission for Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {

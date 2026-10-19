@@ -1,10 +1,14 @@
-name: VoidTerm CI
+name: VoidTerm CI & APK Builder
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build-rust:
@@ -19,28 +23,23 @@ jobs:
           sudo apt-get update && sudo apt-get install -y musl-tools gcc-aarch64-linux-gnu
           rustup target add aarch64-unknown-linux-musl aarch64-linux-android
 
-      - name: Cargo Check (aarch64-linux-android)
-        run: |
-          cd hybrid-term-broker
-          cargo check --target aarch64-linux-android
-
       - name: Cargo Check & Test (Host)
         run: |
           cd hybrid-term-broker
           cargo check
           cargo test --lib
 
-      - name: Build Static Guest Daemon (musl for Debian)
+      - name: Build Static Guest Daemon (musl for Debian microVM)
         env:
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
         run: |
           cd hybrid-term-broker
           cargo build --target aarch64-unknown-linux-musl --bin guest_daemon --release
 
-      - name: Build Host Binaries
+      - name: Build Host Daemon Binary
         run: |
           cd hybrid-term-broker
-          cargo build
+          cargo build --bin hybrid-term-broker --release
 
       - name: Upload Rust Binaries Artifact
         uses: actions/upload-artifact@v4
@@ -49,7 +48,6 @@ jobs:
           path: |
             **/target/**/hybrid-term-broker
             **/target/**/guest_daemon
-            **/target/**/libhybrid_term_broker.*
           if-no-files-found: warn
 
   build-android:
@@ -75,11 +73,9 @@ jobs:
 
       - name: Fetch Official Debian Minimal Rootfs (.tar.gz)
         run: |
-          # Download the official Debian 12 (Bookworm) ARM64 rootfs tarball (.tar.gz)
           echo "Downloading Debian Bookworm ARM64 rootfs..."
           curl -fL -o android/app/src/main/assets/debian-rootfs.tar.gz \
             https://raw.githubusercontent.com/debuerreotype/docker-debian-artifacts/dist-arm64v8/bookworm/slim/oci/blobs/rootfs.tar.gz
-          
           echo "Rootfs fetched successfully: $(ls -lh android/app/src/main/assets/debian-rootfs.tar.gz)"
 
       - name: Set up JDK 17
@@ -87,21 +83,23 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
+          cache: gradle
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Setup Gradle 8.6
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.6'
+      - name: Grant Execute Permission to Gradle Wrapper
+        run: chmod +x android/gradlew
 
-      - name: Build Debug APK
-        run: gradle assembleDebug --stacktrace
+      - name: Assemble Debug APK with Gradle
+        run: |
+          cd android
+          ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: voidterm-debug-apk
+          name: VoidTerm-Debug-APK
           path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: warn
+          if-no-files-found: error
+          retention-days: 14

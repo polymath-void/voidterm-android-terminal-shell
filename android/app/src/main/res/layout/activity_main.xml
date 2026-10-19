@@ -100,17 +100,35 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Floating Action Button to launch Native Settings -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fab_settings"
+    <!-- Floating Action Controls (Settings & Live Voice Mic) -->
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|end"
         android:layout_margin="16dp"
-        android:contentDescription="Settings"
-        app:backgroundTint="#44475A"
-        app:tint="#F8F8F2"
-        app:fabSize="mini"
-        app:srcCompat="@drawable/ic_settings" />
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_settings"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:contentDescription="Settings"
+            app:backgroundTint="#44475A"
+            app:tint="#F8F8F2"
+            app:fabSize="mini"
+            app:srcCompat="@drawable/ic_settings" />
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/fab_voice"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:contentDescription="Live Voice Interaction"
+            app:backgroundTint="#6272A4"
+            app:tint="#50FA7B"
+            app:fabSize="mini"
+            app:srcCompat="@android:drawable/ic_btn_speak_now" />
+    </LinearLayout>
 
 </FrameLayout>

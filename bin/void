@@ -1,4 +1,4 @@
-#!/data/data/com.termux/files/usr/bin/python3
+#!/usr/bin/env python3
 """
 VoidTerm CLI & Package Manager (void)
 Controls VoidTerm modular extension packages (nodeos, jage), updates, and agent status.
@@ -12,12 +12,35 @@ import argparse
 import subprocess
 import urllib.request
 
-CONFIG_DIR = os.path.expanduser("~/.voidterm")
+APP_PRIVATE_DIR = "/data/data/com.hybridengine.terminal/files"
+APP_CACHE_DIR = "/data/data/com.hybridengine.terminal/cache"
+
+def get_base_dir():
+    if os.path.exists(APP_PRIVATE_DIR):
+        return APP_PRIVATE_DIR
+    return os.path.expanduser("~")
+
+CONFIG_DIR = os.path.join(get_base_dir(), ".voidterm")
 CONFIG_FILE = os.path.join(CONFIG_DIR, "packages.json")
-SOCKET_PATH = os.path.join(
-    os.environ.get("TMPDIR", "/data/data/com.termux/files/usr/tmp"),
-    "voidterm_agent.sock"
-)
+
+def get_socket_path():
+    if "VOIDTERM_AGENT_SOCKET" in os.environ:
+        return os.environ["VOIDTERM_AGENT_SOCKET"]
+    candidates = [
+        os.path.join(APP_CACHE_DIR, "voidterm_agent.sock"),
+        os.path.join(APP_PRIVATE_DIR, "voidterm_agent.sock"),
+        os.path.join(os.environ.get("TMPDIR", ""), "voidterm_agent.sock") if os.environ.get("TMPDIR") else None,
+        "/data/data/com.termux/files/usr/tmp/voidterm_agent.sock",
+        "/tmp/voidterm_agent.sock"
+    ]
+    for c in candidates:
+        if c and os.path.exists(c):
+            return c
+    if os.path.exists(APP_CACHE_DIR):
+        return os.path.join(APP_CACHE_DIR, "voidterm_agent.sock")
+    return os.path.join(os.environ.get("TMPDIR", "/tmp"), "voidterm_agent.sock")
+
+SOCKET_PATH = get_socket_path()
 
 DEFAULT_PACKAGES = {
     "nodeos": {
@@ -199,9 +222,10 @@ def cmd_status(args):
     print("\033[1;35m║\033[0m   \033[1;37m🚀 VOIDTERM PLATFORM RUNTIME SNAPSHOT\033[0m                          \033[1;35m║\033[0m")
     print("\033[1;35m╚══════════════════════════════════════════════════════════════════╝\033[0m\n")
 
+    socket_path = get_socket_path()
     # Check ACP socket
-    if os.path.exists(SOCKET_PATH):
-        acp_badge = f"\033[1;32m● Active ({SOCKET_PATH})\033[0m"
+    if os.path.exists(socket_path):
+        acp_badge = f"\033[1;32m● Active ({socket_path})\033[0m"
     else:
         acp_badge = "\033[1;33m○ Standby (Socket offline)\033[0m"
     print(f"  Agent Control Plane : {acp_badge}")
@@ -223,16 +247,17 @@ def cmd_status(args):
     print()
 
 def send_acp_request(req_dict, timeout=5.0):
-    if not os.path.exists(SOCKET_PATH):
+    socket_path = get_socket_path()
+    if not os.path.exists(socket_path):
         return {
             "status": "error",
-            "message": f"Agent Control Plane socket not found at {SOCKET_PATH}. Start the VoidTerm daemon first."
+            "message": f"Agent Control Plane socket not found at {socket_path}. Start the VoidTerm daemon first."
         }
     try:
         import socket
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.settimeout(timeout)
-        s.connect(SOCKET_PATH)
+        s.connect(socket_path)
         payload = (json.dumps(req_dict) + "\n").encode("utf-8")
         s.sendall(payload)
         resp_data = s.recv(65536)
@@ -242,9 +267,9 @@ def send_acp_request(req_dict, timeout=5.0):
             return {"status": "error", "message": "Empty response from Agent Control Plane"}
         return json.loads(line)
     except ConnectionRefusedError:
-        return {"status": "error", "message": f"Connection refused on {SOCKET_PATH}. VoidTerm broker daemon is not running."}
+        return {"status": "error", "message": f"Connection refused on {socket_path}. VoidTerm broker daemon is not running."}
     except FileNotFoundError:
-        return {"status": "error", "message": f"Agent Control Plane socket not found at {SOCKET_PATH}."}
+        return {"status": "error", "message": f"Agent Control Plane socket not found at {socket_path}."}
     except TimeoutError:
         return {"status": "error", "message": f"Socket request timed out ({timeout}s)."}
     except Exception as e:

@@ -68,12 +68,14 @@ impl LocalPty {
         // Determine shell binary
         let shell_path = if !custom_shell.is_empty() && std::path::Path::new(custom_shell).exists() {
             custom_shell
-        } else if std::path::Path::new("/data/data/com.termux/files/usr/bin/bash").exists() {
-            "/data/data/com.termux/files/usr/bin/bash"
-        } else if std::path::Path::new("/data/data/com.termux/files/usr/bin/sh").exists() {
-            "/data/data/com.termux/files/usr/bin/sh"
+        } else if std::path::Path::new("/data/data/com.hybridengine.terminal/files/usr/bin/bash").exists() {
+            "/data/data/com.hybridengine.terminal/files/usr/bin/bash"
+        } else if std::path::Path::new("/data/data/com.hybridengine.terminal/files/bin/sh").exists() {
+            "/data/data/com.hybridengine.terminal/files/bin/sh"
         } else if std::path::Path::new("/system/bin/sh").exists() {
             "/system/bin/sh"
+        } else if std::path::Path::new("/data/data/com.termux/files/usr/bin/bash").exists() {
+            "/data/data/com.termux/files/usr/bin/bash"
         } else {
             "sh"
         };
@@ -88,6 +90,9 @@ impl LocalPty {
         
         if !workdir.is_empty() && std::path::Path::new(workdir).exists() {
             cmd.current_dir(workdir);
+        } else if std::path::Path::new("/data/data/com.hybridengine.terminal/files").exists() {
+            cmd.env("HOME", "/data/data/com.hybridengine.terminal/files");
+            cmd.current_dir("/data/data/com.hybridengine.terminal/files");
         } else if let Ok(home) = std::env::var("HOME") {
             cmd.env("HOME", &home);
             cmd.current_dir(home);

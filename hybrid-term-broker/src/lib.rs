@@ -65,7 +65,17 @@ pub extern "system" fn Java_com_hybridengine_terminal_Broker_startDaemon(
     let _ = TX_INPUT.set(tx_input);
 
     let socket_path = std::env::var("VOIDTERM_AGENT_SOCKET").unwrap_or_else(|_| {
-        let tmp = std::env::var("TMPDIR").unwrap_or_else(|_| "/data/data/com.termux/files/usr/tmp".to_string());
+        let tmp = std::env::var("TMPDIR").unwrap_or_else(|_| {
+            if std::path::Path::new("/data/data/com.hybridengine.terminal/cache").exists() {
+                "/data/data/com.hybridengine.terminal/cache".to_string()
+            } else if std::path::Path::new("/data/data/com.hybridengine.terminal/files").exists() {
+                "/data/data/com.hybridengine.terminal/files".to_string()
+            } else if std::path::Path::new("/data/data/com.termux/files/usr/tmp").exists() {
+                "/data/data/com.termux/files/usr/tmp".to_string()
+            } else {
+                "/tmp".to_string()
+            }
+        });
         format!("{}/voidterm_agent.sock", tmp)
     });
     let acp = AgentControlPlane::new(tx_acp);
