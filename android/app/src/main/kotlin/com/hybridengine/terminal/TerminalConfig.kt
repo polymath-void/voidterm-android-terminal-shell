@@ -3,6 +3,7 @@ package com.hybridengine.terminal
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Color
+import androidx.preference.PreferenceManager
 
 /**
  * Terminal theme definitions containing full color palettes.
@@ -90,8 +91,6 @@ enum class CursorStyle(val symbol: String) {
         }
     }
 }
-
-import androidx.preference.PreferenceManager
 
 /**
  * Configuration manager backed by PreferenceManager.getDefaultSharedPreferences.

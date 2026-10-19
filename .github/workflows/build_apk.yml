@@ -8,17 +8,41 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
+  build-rust-guest:
+    name: Build Static Musl Guest Daemon (ARM64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Install Rust AArch64 Musl Toolchain
+        run: |
+          sudo apt-get update && sudo apt-get install -y musl-tools gcc-aarch64-linux-gnu
+          rustup target add aarch64-unknown-linux-musl
+
+      - name: Compile Static Guest Daemon Binary
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
+        run: |
+          cd hybrid-term-broker
+          cargo build --target aarch64-unknown-linux-musl --bin guest_daemon --release
+
+      - name: Upload Guest Daemon Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voidterm-guest-daemon
+          path: hybrid-term-broker/target/aarch64-unknown-linux-musl/release/guest_daemon
+          retention-days: 7
+
   build-apk:
     name: Assemble Android APK
     runs-on: ubuntu-latest
+    needs: build-rust-guest
     timeout-minutes: 30
-
-    defaults:
-      run:
-        working-directory: android
 
     steps:
       - name: Checkout Source Code
@@ -30,17 +54,38 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
+          cache-dependency-path: 'android/gradle/wrapper/gradle-wrapper.properties'
+
+      - name: Download Guest Daemon Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: voidterm-guest-daemon
+          path: guest-daemon-bin
+
+      - name: Stage MicroVM Assets
+        run: |
+          mkdir -p android/app/src/main/assets
+          if [ -f guest-daemon-bin/guest_daemon ]; then
+            cp guest-daemon-bin/guest_daemon android/app/src/main/assets/guest_daemon
+            chmod +x android/app/src/main/assets/guest_daemon
+            echo "✅ Bundled static guest_daemon into assets."
+          fi
+          echo "Fetching Debian Bookworm ARM64 minimal rootfs..."
+          curl -fL -o android/app/src/main/assets/debian-rootfs.tar.gz \
+            https://raw.githubusercontent.com/debuerreotype/docker-debian-artifacts/dist-arm64v8/bookworm/slim/oci/blobs/rootfs.tar.gz
+          echo "✅ Rootfs staged: $(ls -lh android/app/src/main/assets/debian-rootfs.tar.gz)"
 
       - name: Grant Execute Permission to Gradle Wrapper
-        run: chmod +x gradlew
+        run: chmod +x android/gradlew
 
       - name: Assemble Debug APK with Gradle
+        working-directory: android
         run: ./gradlew assembleDebug --stacktrace --no-daemon
 
       - name: Verify Debug APK Output
         run: |
           echo "Listing generated APK artifacts:"
-          ls -la app/build/outputs/apk/debug/
+          ls -la android/app/build/outputs/apk/debug/
 
       - name: Upload Debug APK Artifact
         uses: actions/upload-artifact@v4
