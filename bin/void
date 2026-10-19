@@ -222,6 +222,160 @@ def cmd_status(args):
     print(f"  AVF virtio-vsock    : {vsock_badge}")
     print()
 
+def send_acp_request(req_dict, timeout=5.0):
+    if not os.path.exists(SOCKET_PATH):
+        return {
+            "status": "error",
+            "message": f"Agent Control Plane socket not found at {SOCKET_PATH}. Start the VoidTerm daemon first."
+        }
+    try:
+        import socket
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(timeout)
+        s.connect(SOCKET_PATH)
+        payload = (json.dumps(req_dict) + "\n").encode("utf-8")
+        s.sendall(payload)
+        resp_data = s.recv(65536)
+        s.close()
+        line = resp_data.decode("utf-8").strip()
+        if not line:
+            return {"status": "error", "message": "Empty response from Agent Control Plane"}
+        return json.loads(line)
+    except ConnectionRefusedError:
+        return {"status": "error", "message": f"Connection refused on {SOCKET_PATH}. VoidTerm broker daemon is not running."}
+    except FileNotFoundError:
+        return {"status": "error", "message": f"Agent Control Plane socket not found at {SOCKET_PATH}."}
+    except TimeoutError:
+        return {"status": "error", "message": f"Socket request timed out ({timeout}s)."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+def cmd_agent_ping(args):
+    resp = send_acp_request({"action": "ping"})
+    if resp.get("status") == "success":
+        print(f"\033[1;32m[✔] {resp.get('message')}\033[0m")
+        return 0
+    else:
+        print(f"\033[1;31m[-] {resp.get('message')}\033[0m")
+        return 1
+
+def cmd_agent_list(args):
+    resp = send_acp_request({"action": "list_sessions"})
+    if resp.get("status") == "success":
+        sessions = resp.get("sessions", [])
+        print(f"\n[*] Active VoidTerm Agent Sessions ({len(sessions)}):")
+        for s in sessions:
+            print(f"  • \033[1;36m{s['session_id']}\033[0m  tier={s['tier']}  workdir={s['workdir']}")
+        print()
+        return 0
+    else:
+        print(f"\033[1;31m[-] {resp.get('message')}\033[0m")
+        return 1
+
+def cmd_agent_create(args):
+    req = {
+        "action": "create_session",
+        "session_id": args.session_id,
+        "tier": args.tier,
+        "workdir": os.path.abspath(args.workdir),
+        "shell": args.shell
+    }
+    resp = send_acp_request(req)
+    if resp.get("status") == "success":
+        print(f"\033[1;32m[✔] {resp.get('message')}\033[0m")
+        return 0
+    else:
+        print(f"\033[1;31m[-] {resp.get('message')}\033[0m")
+        return 1
+
+def cmd_agent_exec(args):
+    req = {
+        "action": "exec",
+        "session_id": args.session,
+        "command": args.command
+    }
+    resp = send_acp_request(req)
+    if resp.get("status") == "success":
+        print(f"\033[1;32m[✔] {resp.get('message')}\033[0m")
+        return 0
+    else:
+        if "not found" in resp.get("message", "").lower() and args.session == "default":
+            create_resp = send_acp_request({
+                "action": "create_session",
+                "session_id": "default",
+                "tier": "local",
+                "workdir": os.getcwd()
+            })
+            if create_resp.get("status") == "success":
+                resp = send_acp_request(req)
+                if resp.get("status") == "success":
+                    print(f"\033[1;32m[✔] {resp.get('message')}\033[0m")
+                    return 0
+        print(f"\033[1;31m[-] {resp.get('message')}\033[0m")
+        return 1
+
+def cmd_agent_input(args):
+    req = {
+        "action": "input",
+        "session_id": args.session,
+        "data": args.data
+    }
+    resp = send_acp_request(req)
+    if resp.get("status") == "success":
+        print(f"\033[1;32m[✔] {resp.get('message')}\033[0m")
+        return 0
+    else:
+        print(f"\033[1;31m[-] {resp.get('message')}\033[0m")
+        return 1
+
+def cmd_agent_snapshot(args):
+    req = {
+        "action": "read_snapshot",
+        "session_id": args.session,
+        "lines": args.lines
+    }
+    resp = send_acp_request(req)
+    if resp.get("status") == "success":
+        content = resp.get("content", "")
+        if content:
+            print(content)
+        else:
+            print("[*] (Snapshot buffer empty)")
+        return 0
+    else:
+        print(f"\033[1;31m[-] {resp.get('message')}\033[0m")
+        return 1
+
+def cmd_agent_hud(args):
+    req = {
+        "action": "hud_telemetry",
+        "agent_name": args.agent,
+        "status": args.status,
+        "thought": args.thought,
+        "active_file": args.file or "",
+        "progress": args.progress
+    }
+    resp = send_acp_request(req)
+    if resp.get("status") == "success":
+        print(f"\033[1;32m[✔] HUD Telemetry broadcasted: [{args.status.upper()}] {args.thought}\033[0m")
+        return 0
+    else:
+        print(f"\033[1;31m[-] {resp.get('message')}\033[0m")
+        return 1
+
+def cmd_agent_close(args):
+    req = {
+        "action": "close_session",
+        "session_id": args.session_id
+    }
+    resp = send_acp_request(req)
+    if resp.get("status") == "success":
+        print(f"\033[1;32m[✔] {resp.get('message')}\033[0m")
+        return 0
+    else:
+        print(f"\033[1;31m[-] {resp.get('message')}\033[0m")
+        return 1
+
 def main():
     parser = argparse.ArgumentParser(
         prog="void",
@@ -231,6 +385,41 @@ def main():
 
     # status
     subparsers.add_parser("status", help="Show VoidTerm platform & agent runtime status")
+
+    # agent
+    p_agent = subparsers.add_parser("agent", help="Interact with VoidTerm Agent Control Plane (ACP)")
+    agent_sub = p_agent.add_subparsers(dest="agent_action", required=True)
+
+    agent_sub.add_parser("ping", help="Ping the Agent Control Plane socket")
+    agent_sub.add_parser("list", help="List active agent execution sessions")
+
+    p_create = agent_sub.add_parser("create", help="Create a new terminal session")
+    p_create.add_argument("session_id", help="Session ID (e.g. polymath-1)")
+    p_create.add_argument("--tier", choices=["local", "wasm", "vm"], default="local", help="Execution tier")
+    p_create.add_argument("--workdir", default=os.getcwd(), help="Initial working directory")
+    p_create.add_argument("--shell", default="", help="Custom shell binary path")
+
+    p_exec = agent_sub.add_parser("exec", help="Dispatch a command to a session")
+    p_exec.add_argument("command", help="Command string to execute")
+    p_exec.add_argument("--session", default="default", help="Target session ID")
+
+    p_in = agent_sub.add_parser("input", help="Send raw keystrokes/data to a session")
+    p_in.add_argument("data", help="Data or keystrokes to send")
+    p_in.add_argument("--session", default="default", help="Target session ID")
+
+    p_snap = agent_sub.add_parser("snapshot", help="Capture terminal scrollback buffer")
+    p_snap.add_argument("--session", default="default", help="Target session ID")
+    p_snap.add_argument("--lines", type=int, default=50, help="Number of scrollback lines")
+
+    p_hud = agent_sub.add_parser("hud", help="Broadcast HUD telemetry to VoidTerm UI")
+    p_hud.add_argument("thought", help="Agent thought or status message")
+    p_hud.add_argument("--agent", default="Polymath", help="Agent name")
+    p_hud.add_argument("--status", default="working", choices=["working", "thinking", "running", "completed", "error", "idle"], help="Current status")
+    p_hud.add_argument("--file", default="", help="Active file being modified")
+    p_hud.add_argument("--progress", type=float, default=None, help="Progress from 0.0 to 1.0")
+
+    p_close = agent_sub.add_parser("close", help="Close an active session")
+    p_close.add_argument("session_id", help="Session ID to terminate")
 
     # pkg
     p_pkg = subparsers.add_parser("pkg", help="Manage modular extension packages")
@@ -260,6 +449,23 @@ def main():
 
     if args.subcommand == "status":
         cmd_status(args)
+    elif args.subcommand == "agent":
+        if args.agent_action == "ping":
+            sys.exit(cmd_agent_ping(args))
+        elif args.agent_action == "list":
+            sys.exit(cmd_agent_list(args))
+        elif args.agent_action == "create":
+            sys.exit(cmd_agent_create(args))
+        elif args.agent_action == "exec":
+            sys.exit(cmd_agent_exec(args))
+        elif args.agent_action == "input":
+            sys.exit(cmd_agent_input(args))
+        elif args.agent_action == "snapshot":
+            sys.exit(cmd_agent_snapshot(args))
+        elif args.agent_action == "hud":
+            sys.exit(cmd_agent_hud(args))
+        elif args.agent_action == "close":
+            sys.exit(cmd_agent_close(args))
     elif args.subcommand == "pkg":
         if args.pkg_action == "list":
             cmd_pkg_list(args)

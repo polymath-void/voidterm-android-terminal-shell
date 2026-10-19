@@ -1,10 +1,20 @@
 package com.hybridengine.terminal
 
 import android.util.Log
+import org.json.JSONObject
+
+data class HudTelemetry(
+    val agent: String,
+    val status: String,
+    val thought: String,
+    val activeFile: String? = null,
+    val progress: Float? = null
+)
 
 class Broker(var outputListener: ((String) -> Unit)? = null) {
     
     private var isNativeLoaded = false
+    var hudTelemetryListener: ((HudTelemetry) -> Unit)? = null
 
     constructor(terminalView: TerminalSurfaceView) : this({ terminalView.appendOutput(it) })
 
@@ -68,6 +78,23 @@ class Broker(var outputListener: ((String) -> Unit)? = null) {
     private external fun provisionDiskNative(diskPath: String, rootfsDir: String)
 
     fun onTerminalOutput(output: String) {
+        if (output.startsWith("__HUD_TELEMETRY__:")) {
+            val jsonStr = output.removePrefix("__HUD_TELEMETRY__:")
+            try {
+                val obj = JSONObject(jsonStr)
+                val telemetry = HudTelemetry(
+                    agent = obj.optString("agent", "Agent"),
+                    status = obj.optString("status", "working"),
+                    thought = obj.optString("thought", ""),
+                    activeFile = if (obj.has("active_file") && !obj.isNull("active_file")) obj.getString("active_file") else null,
+                    progress = if (obj.has("progress") && !obj.isNull("progress")) obj.getDouble("progress").toFloat() else null
+                )
+                hudTelemetryListener?.invoke(telemetry)
+                return
+            } catch (e: Exception) {
+                Log.w("VoidTerm", "Failed to parse HUD telemetry: ${e.message}")
+            }
+        }
         emitOutput(output)
     }
 

@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::mpsc;
@@ -10,6 +10,11 @@ use crate::IpcMessage;
 pub struct VmBridge;
 
 impl VmBridge {
+    /// Checks if a kernel virtio-vsock device is accessible on the host
+    pub fn is_vsock_available() -> bool {
+        std::path::Path::new("/dev/vsock").exists() || std::path::Path::new("/dev/vhost-vsock").exists()
+    }
+
     /// Connects to the guest daemon over virtio-vsock with a retry loop
     /// to seamlessly wait for systemd initialization inside the microVM.
     pub async fn connect_guest_daemon(
@@ -17,8 +22,12 @@ impl VmBridge {
         port: u32,
         tx_output: &mpsc::Sender<IpcMessage>,
     ) -> Result<VsockStream> {
+        if !Self::is_vsock_available() {
+            bail!("AVF virtio-vsock device (/dev/vsock) is not available on this host.");
+        }
+
         let addr = VsockAddr::new(guest_cid, port);
-        let mut retries = 10;
+        let mut retries = 6;
         let delay = Duration::from_millis(500);
 
         loop {
@@ -30,8 +39,8 @@ impl VmBridge {
                 Err(e) => {
                     retries -= 1;
                     if retries == 0 {
-                        anyhow::bail!(
-                            "Failed to establish vsock connection to AVF guest VM after 10 attempts: {}",
+                        bail!(
+                            "Failed to establish vsock connection to AVF guest VM after retries: {}",
                             e
                         );
                     }

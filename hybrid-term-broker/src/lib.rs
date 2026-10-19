@@ -2,7 +2,7 @@ use jni::objects::{GlobalRef, JClass, JObject, JString, JValue};
 use jni::JavaVM;
 use jni::JNIEnv;
 use serde::{Deserialize, Serialize};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
@@ -13,6 +13,7 @@ pub mod vm_bridge;
 pub mod wasm_engine;
 
 use acp::AgentControlPlane;
+use local_pty::LocalPty;
 use storage::StorageProvisioner;
 
 // Default AVF Guest VM Context ID and Port
@@ -38,6 +39,7 @@ static CALLBACK_OBJ: OnceLock<GlobalRef> = OnceLock::new();
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 static TX_INPUT: OnceLock<mpsc::Sender<IpcMessage>> = OnceLock::new();
 static ACP: OnceLock<AgentControlPlane> = OnceLock::new();
+static LOCAL_PTY: OnceLock<Arc<LocalPty>> = OnceLock::new();
 
 #[no_mangle]
 pub extern "system" fn Java_com_hybridengine_terminal_Broker_startDaemon(
@@ -69,6 +71,18 @@ pub extern "system" fn Java_com_hybridengine_terminal_Broker_startDaemon(
     let acp = AgentControlPlane::new(tx_acp);
     let _ = ACP.set(acp.clone());
 
+    // Initialize local PTY for interactive shell sessions
+    let tx_pty = tx_output.clone();
+    match LocalPty::start(tx_pty) {
+        Ok(pty) => {
+            let _ = LOCAL_PTY.set(Arc::new(pty));
+            println!("✅ [JNI] Local PTY interactive shell initialized.");
+        }
+        Err(e) => {
+            eprintln!("⚠️ [JNI] Could not initialize local PTY: {}", e);
+        }
+    }
+
     rt.spawn(async move {
         if let Err(e) = acp.start_socket_server(&socket_path).await {
             eprintln!("❌ [JNI] Failed to start Agent Control Plane: {}", e);
@@ -90,7 +104,31 @@ pub extern "system" fn Java_com_hybridengine_terminal_Broker_startDaemon(
         // The INGRESS loop (Kotlin UI -> Rust -> Debian VM vsock)
         while let Some(msg) = rx_input.recv().await {
             match msg {
-                IpcMessage::ExecuteLocal { command } | IpcMessage::ExecuteVm { command } => {
+                IpcMessage::ExecuteLocal { command } => {
+                    if vm_bridge::VmBridge::is_vsock_available() {
+                        let tx_clone = tx_output.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = vm_bridge::VmBridge::dispatch_command(
+                                command,
+                                DEFAULT_VM_CID,
+                                VM_VSOCK_PORT,
+                                tx_clone.clone(),
+                            ).await {
+                                let err_msg = format!("❌ [VM Vsock Error]: {}\n", e);
+                                let _ = tx_clone.send(IpcMessage::TerminalOutput(err_msg)).await;
+                            }
+                        });
+                    } else if let Some(pty) = LOCAL_PTY.get() {
+                        if let Err(e) = pty.write_command(&command) {
+                            let err_msg = format!("❌ [Local PTY Error]: {}\n", e);
+                            let _ = tx_output.send(IpcMessage::TerminalOutput(err_msg)).await;
+                        }
+                    } else {
+                        let err_msg = "⚠️ [Broker] Neither AVF MicroVM nor Local PTY is available.\n".to_string();
+                        let _ = tx_output.send(IpcMessage::TerminalOutput(err_msg)).await;
+                    }
+                }
+                IpcMessage::ExecuteVm { command } => {
                     let tx_clone = tx_output.clone();
                     tokio::spawn(async move {
                         if let Err(e) = vm_bridge::VmBridge::dispatch_command(
