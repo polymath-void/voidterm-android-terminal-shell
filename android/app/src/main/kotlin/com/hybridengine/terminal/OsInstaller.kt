@@ -20,20 +20,19 @@ class OsInstaller(private val context: Context) {
         Log.d("VoidTerm-Installer", "Checking for bundled Debian rootfs archive...")
 
         try {
-            // Check if the asset exists
-            val assetList = context.assets.list("") ?: emptyArray()
-            if (!assetList.contains("debian-rootfs.tar.gz")) {
-                Log.i("VoidTerm-Installer", "No bundled debian-rootfs.tar.gz found in assets. Skipping auto-extraction.")
-                return
-            }
-
-            Log.d("VoidTerm-Installer", "First boot detected. Unpacking Debian rootfs...")
-
-            // 1. Copy the tarball from the APK assets to internal storage
-            context.assets.open("debian-rootfs.tar.gz").use { inputStream ->
-                FileOutputStream(archiveFile).use { outputStream ->
-                    inputStream.copyTo(outputStream)
+            // Check if rootfs asset exists (.tar or .tar.gz)
+            val tarAsset = assetList.firstOrNull { it.startsWith("debian-rootfs.tar") }
+            if (tarAsset != null) {
+                Log.d("VoidTerm-Installer", "First boot detected. Unpacking Debian rootfs ($tarAsset)...")
+                context.assets.open(tarAsset).use { inputStream ->
+                    FileOutputStream(archiveFile).use { outputStream ->
+                        inputStream.copyTo(outputStream)
+                    }
                 }
+                rootfsDir.mkdirs()
+                Log.d("VoidTerm-Installer", "✅ Debian OS rootfs staged successfully.")
+            } else {
+                Log.i("VoidTerm-Installer", "No bundled debian-rootfs found in assets. Skipping auto-extraction.")
             }
 
             // 2. Copy the static guest_daemon binary if bundled in assets
@@ -48,13 +47,7 @@ class OsInstaller(private val context: Context) {
                 Log.d("VoidTerm-Installer", "✅ Static guest_daemon staged at ${guestDaemonFile.absolutePath}")
             }
 
-            // 3. Create the destination directory
-            rootfsDir.mkdirs()
-
-            // 4. Extract the tarball (or prepare for guest microVM mount)
             Log.d("VoidTerm-Installer", "Archive staged at ${archiveFile.absolutePath} for AVF microVM.")
-
-            Log.d("VoidTerm-Installer", "✅ Debian OS rootfs staged successfully.")
 
         } catch (e: Exception) {
             Log.e("VoidTerm-Installer", "OS Installation failed: ${e.message}")
