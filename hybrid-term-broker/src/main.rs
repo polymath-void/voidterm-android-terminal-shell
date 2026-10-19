@@ -1,30 +1,26 @@
-mod local_pty;
-mod vm_bridge;
-mod wasm_engine;
-
-use serde::{Deserialize, Serialize};
+use hybrid_term_broker::acp::AgentControlPlane;
+use hybrid_term_broker::vm_bridge::VmBridge;
+use hybrid_term_broker::wasm_engine::WasmEngine;
+use hybrid_term_broker::IpcMessage;
 use tokio::sync::mpsc;
-use vm_bridge::VmBridge;
-use wasm_engine::WasmEngine;
 
 // Default AVF Guest VM Context ID and Port
 const DEFAULT_VM_CID: u32 = 3;
 const VM_VSOCK_PORT: u32 = 8000;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum IpcMessage {
-    ExecuteLocal { command: String },
-    ExecuteWasm { module_name: String, args: Vec<String> },
-    ExecuteVm { command: String },
-    TerminalOutput(String),
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     println!("🚀 VoidTerm Hybrid IPC Broker initialized (direct Debian VM vsock).");
 
     let (tx_output, mut rx_output) = mpsc::channel::<IpcMessage>(1024);
-    let (_tx_input, mut rx_input) = mpsc::channel::<IpcMessage>(1024);
+    let (tx_input, mut rx_input) = mpsc::channel::<IpcMessage>(1024);
+
+    let socket_path = std::env::var("VOIDTERM_AGENT_SOCKET").unwrap_or_else(|_| {
+        let tmp = std::env::var("TMPDIR").unwrap_or_else(|_| "/data/data/com.termux/files/usr/tmp".to_string());
+        format!("{}/voidterm_agent.sock", tmp)
+    });
+    let acp = AgentControlPlane::new(tx_input.clone());
+    acp.start_socket_server(&socket_path).await?;
 
     println!("📡 Listening for Debian microVM commands on CID {} port {}...", DEFAULT_VM_CID, VM_VSOCK_PORT);
 

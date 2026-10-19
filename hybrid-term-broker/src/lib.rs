@@ -6,11 +6,13 @@ use std::sync::OnceLock;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
+pub mod acp;
 pub mod local_pty;
 pub mod storage;
 pub mod vm_bridge;
 pub mod wasm_engine;
 
+use acp::AgentControlPlane;
 use storage::StorageProvisioner;
 
 // Default AVF Guest VM Context ID and Port
@@ -35,6 +37,7 @@ static JVM: OnceLock<JavaVM> = OnceLock::new();
 static CALLBACK_OBJ: OnceLock<GlobalRef> = OnceLock::new();
 static RUNTIME: OnceLock<Runtime> = OnceLock::new();
 static TX_INPUT: OnceLock<mpsc::Sender<IpcMessage>> = OnceLock::new();
+static ACP: OnceLock<AgentControlPlane> = OnceLock::new();
 
 #[no_mangle]
 pub extern "system" fn Java_com_hybridengine_terminal_Broker_startDaemon(
@@ -56,7 +59,21 @@ pub extern "system" fn Java_com_hybridengine_terminal_Broker_startDaemon(
     let (tx_input, mut rx_input) = mpsc::channel::<IpcMessage>(1024);
     let (tx_output, mut rx_output) = mpsc::channel::<IpcMessage>(1024);
 
+    let tx_acp = tx_input.clone();
     let _ = TX_INPUT.set(tx_input);
+
+    let socket_path = std::env::var("VOIDTERM_AGENT_SOCKET").unwrap_or_else(|_| {
+        let tmp = std::env::var("TMPDIR").unwrap_or_else(|_| "/data/data/com.termux/files/usr/tmp".to_string());
+        format!("{}/voidterm_agent.sock", tmp)
+    });
+    let acp = AgentControlPlane::new(tx_acp);
+    let _ = ACP.set(acp.clone());
+
+    rt.spawn(async move {
+        if let Err(e) = acp.start_socket_server(&socket_path).await {
+            eprintln!("❌ [JNI] Failed to start Agent Control Plane: {}", e);
+        }
+    });
 
     rt.spawn(async move {
         println!("🚀 [JNI] VoidTerm Broker daemon running (Debian microVM direct vsock routing)...");

@@ -13,12 +13,12 @@ The **Hybrid Engine** is a high-performance Android execution environment combin
 ## 2. Core Operational Directives (STRICT ENFORCEMENT)
 
 ### Rule 1: Mandatory Context Synchronization (`CONTEXT.md`)
-1. **Pre-Task Check**: Every agent session or subagent invocation MUST review [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md) before making modifications.
-2. **Atomic Context Updates**: Whenever any subsystem is modified, designed, refactored, or tested, the agent MUST immediately update [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
-3. **No Phantom State**: Never introduce architectural components, configuration flags, or protocol changes without recording them in [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md).
+1. **Pre-Task Check**: Every agent session or subagent invocation MUST review [CONTEXT.md](file:///data/data/com.termux/files/home/Projects/polymath-void/hybrid-engine/CONTEXT.md) before making modifications.
+2. **Atomic Context Updates**: Whenever any subsystem is modified, designed, refactored, or tested, the agent MUST immediately update [CONTEXT.md](file:///data/data/com.termux/files/home/Projects/polymath-void/hybrid-engine/CONTEXT.md).
+3. **No Phantom State**: Never introduce architectural components, configuration flags, or protocol changes without recording them in [CONTEXT.md](file:///data/data/com.termux/files/home/Projects/polymath-void/hybrid-engine/CONTEXT.md).
 
 ### Rule 2: Category-Based Event Logging Protocol
-Every event, modification, architectural decision, or validation test MUST be appended to the **Event Log** section in [CONTEXT.md](file:///data/data/com.termux/files/home/hybrid-engine/CONTEXT.md) using the following strict category schema:
+Every event, modification, architectural decision, or validation test MUST be appended to the **Event Log** section in [CONTEXT.md](file:///data/data/com.termux/files/home/Projects/polymath-void/hybrid-engine/CONTEXT.md) using the following strict category schema:
 
 | Category Tag | Domain / Scope |
 | :--- | :--- |

@@ -1,0 +1,36 @@
+{
+  "OSC_TITLE": {
+    "header": "\\x1b]0;",
+    "terminator": "\\x07",
+    "action": "SetWindowTitle"
+  },
+  "ALT_SCREEN_ENTER": {
+    "sequence": "\\x1b[?1049h",
+    "action": "SwitchToAlternateScreenBuffer"
+  },
+  "ALT_SCREEN_EXIT": {
+    "sequence": "\\x1b[?1049l",
+    "action": "RestoreNormalScreenBuffer"
+  },
+  "CURSOR_HOME": {
+    "sequence": "\\x1b[H",
+    "action": "MoveCursorOrigin"
+  },
+  "CLEAR_SCREEN": {
+    "sequence": "\\x1b[2J",
+    "action": "ClearEntireScreen"
+  },
+  "BRACKETED_PASTE_ENABLE": {
+    "sequence": "\\x1b[?2004h",
+    "action": "EnableBracketedPaste"
+  },
+  "COLOR_RGB": {
+    "prefix": "\\x1b[38;2;",
+    "suffix": "m",
+    "action": "TrueColorForeground"
+  },
+  "RESET": {
+    "sequence": "\\x1b[0m",
+    "action": "ResetFormatting"
+  }
+}
