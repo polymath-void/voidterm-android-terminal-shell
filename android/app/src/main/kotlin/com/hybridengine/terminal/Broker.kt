@@ -71,10 +71,12 @@ class Broker(
         }
         if (trimmed == "help" || trimmed == "void help") {
             emitOutput("\r\n\u001b[36m--- VoidTerm Builtin Directives ---\u001b[0m\r\n")
+            emitOutput("  void       : Core control script (pkg, reload, status, version)\r\n")
+            emitOutput("  voidfs     : Inspect VoidFS rootless POSIX architecture\r\n")
+            emitOutput("  pkg        : Package manager interface\r\n")
             emitOutput("  reload     : Hot-reload /files/usr/bin/* and voidterm.json\r\n")
-            emitOutput("  restart    : Restart the active shell session\r\n")
-            emitOutput("  void status: Inspect runtime kernel, architecture & environment\r\n")
-            emitOutput("  void pkg   : Package manager interface\r\n\r\n")
+            emitOutput("  restart    : Restart the active shell session\r\n\r\n")
+            return
         }
 
         if (localSession != null) {

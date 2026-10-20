@@ -46,6 +46,12 @@ class LocalProcessSession(
         env["PATH"] = "$usrPath/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
         env["VOIDTERM_VERSION"] = "1.0.0-alpha"
 
+        // Ensure executable permissions on all usr/bin scripts
+        File(usrPath, "bin").listFiles()?.forEach { file ->
+            file.setExecutable(true, false)
+            file.setReadable(true, false)
+        }
+
         try {
             val proc = pb.start()
             process = proc
@@ -81,7 +87,7 @@ class LocalProcessSession(
             }
 
             onOutput("\r\n\u001b[32m🚀 VoidTerm Shell Host Active\u001b[0m\r\n")
-            val engineType = if (voidFS.isKernelSupported()) "Linux 5.15 Mount NS (KernelSU)" else "Bionic POSIX Sandbox"
+            val engineType = "Rootless POSIX Container (Termux-Architecture)"
             onOutput("\u001b[36mEngine:\u001b[0m $engineType | \u001b[35mShell:\u001b[0m $shellBinary\r\n")
             onOutput("\u001b[33mType 'help' or 'void' to begin.\u001b[0m\r\n\r\n")
 

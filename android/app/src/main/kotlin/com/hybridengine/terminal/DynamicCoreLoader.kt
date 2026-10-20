@@ -109,15 +109,30 @@ object DynamicCoreLoader {
         )
 
         deployScript(
+            File(usrBin, "help"),
+            """
+            #!/system/bin/sh
+            echo "\033[36m--- VoidTerm Builtin Directives ---\033[0m"
+            echo "  void       : Core control script (pkg, reload, status, version)"
+            echo "  voidfs     : Inspect VoidFS rootless POSIX architecture"
+            echo "  pkg        : Package manager interface"
+            echo "  reload     : Hot-reload /files/usr/bin/* scripts and voidterm.json"
+            echo "  restart    : Restart the active shell session"
+            echo "  storage/   : Access external storage (/sdcard) via ${'$'}HOME/storage"
+            """.trimIndent()
+        )
+
+        deployScript(
             File(usrBin, "voidfs"),
             """
             #!/system/bin/sh
-            echo "\033[36m=== VoidFS Linux Kernel Architecture ===\033[0m"
-            echo "Mount Namespaces: Supported (CLONE_NEWNS)"
-            echo "OverlayFS Status: ${'$'}(grep overlay /proc/filesystems || echo 'unavailable')"
-            echo "Active Mounts:"
-            grep -E "overlay|tmpfs|debian" /proc/mounts || echo "  (Standard POSIX sandbox mounts active)"
-            echo "Storage Bridge: /sdcard/VoidTerm -> ${'$'}HOME/sdcard"
+            echo "\033[36m=== VoidFS Rootless POSIX Architecture ===\033[0m"
+            echo "Type: Rootless Termux-compatible FHS"
+            echo "Prefix: ${'$'}PREFIX"
+            echo "Home: ${'$'}HOME"
+            echo "Storage Bridge: ${'$'}HOME/storage/shared -> /sdcard"
+            echo "Active FHS Dirs:"
+            ls -ld ${'$'}PREFIX/bin ${'$'}PREFIX/etc ${'$'}PREFIX/tmp ${'$'}HOME
             """.trimIndent()
         )
 
@@ -127,8 +142,8 @@ object DynamicCoreLoader {
             deployScript(
                 bashrc,
                 """
-                export PS1="root@voidterm:\w# "
-                export PATH="$usrBin:/system/bin:/system/xbin"
+                export PS1="voidterm:\w$ "
+                export PATH="$usrBin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
                 export TERM="xterm-256color"
                 alias ls="ls --color=auto"
                 alias ll="ls -la"
