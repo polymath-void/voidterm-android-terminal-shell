@@ -41,6 +41,7 @@ class LocalProcessSession(
         env["HOME"] = homePath
         env["PREFIX"] = usrPath
         env["TMPDIR"] = tmpPath
+        env["ENV"] = "$homePath/.bashrc"
         env["TERM"] = "xterm-256color"
         env["SHELL"] = shellBinary
         env["PATH"] = "$usrPath/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
