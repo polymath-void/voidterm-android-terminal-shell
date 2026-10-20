@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -16,8 +18,11 @@ import android.os.IBinder
 import android.os.Looper
 import android.provider.Settings
 import android.util.Log
+import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.View
 import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -80,6 +85,7 @@ class MainActivity : AppCompatActivity() {
 
         // 2. Initialize Fullscreen Terminal View & HUD Overlay
         terminalSurface = findViewById(R.id.terminal_surface)
+        setupKeyboardToolbar()
         cardAgentHud = findViewById(R.id.card_agent_hud)
         textHudBadge = findViewById(R.id.text_hud_badge)
         textHudAgentName = findViewById(R.id.text_hud_agent_name)
@@ -273,6 +279,89 @@ class MainActivity : AppCompatActivity() {
             terminalService?.broker?.hudTelemetryListener = null
             unbindService(serviceConnection)
             isBound = false
+        }
+    }
+
+    private fun setupKeyboardToolbar() {
+        val keysLayout = findViewById<LinearLayout>(R.id.layout_keyboard_keys) ?: return
+
+        data class KeyDef(
+            val label: String,
+            val action: () -> Unit,
+            val isActionKey: Boolean = false,
+            val isAccentKey: Boolean = false
+        )
+
+        val keys = listOf(
+            KeyDef("ESC", { terminalSurface.insertText("\u001b") }, isActionKey = true),
+            KeyDef("TAB", { terminalSurface.handleTabCompletion() }, isAccentKey = true),
+            KeyDef("^C", { terminalSurface.handleCtrlC() }, isActionKey = true),
+            KeyDef("↑", { terminalSurface.handleHistoryUp() }, isAccentKey = true),
+            KeyDef("↓", { terminalSurface.handleHistoryDown() }, isAccentKey = true),
+            KeyDef("←", { terminalSurface.moveCursorLeft() }),
+            KeyDef("→", { terminalSurface.moveCursorRight() }),
+            KeyDef("/", { terminalSurface.insertText("/") }),
+            KeyDef("-", { terminalSurface.insertText("-") }),
+            KeyDef("~", { terminalSurface.insertText("~") }),
+            KeyDef("|", { terminalSurface.insertText("|") }),
+            KeyDef("$", { terminalSurface.insertText("$") }),
+            KeyDef("\"", { terminalSurface.insertText("\"") }),
+            KeyDef(":", { terminalSurface.insertText(":") }),
+            KeyDef(";", { terminalSurface.insertText(";") }),
+            KeyDef("&", { terminalSurface.insertText("&") }),
+            KeyDef("BKSP", { terminalSurface.deleteLastChar() }),
+            KeyDef("CLR", { terminalSurface.clearScreen() }, isActionKey = true)
+        )
+
+        val density = resources.displayMetrics.density
+        val minWidthPx = (38 * density).toInt()
+        val heightPx = (32 * density).toInt()
+        val marginPx = (2 * density).toInt()
+        val paddingHorizontalPx = (8 * density).toInt()
+
+        for (key in keys) {
+            val btn = TextView(this).apply {
+                text = key.label
+                textSize = 12f
+                typeface = Typeface.MONOSPACE
+                gravity = Gravity.CENTER
+                minWidth = minWidthPx
+                minimumWidth = minWidthPx
+                height = heightPx
+                setPadding(paddingHorizontalPx, 0, paddingHorizontalPx, 0)
+                isClickable = true
+                isFocusable = false
+
+                val textColor = when {
+                    key.isActionKey -> Color.parseColor("#FF5555")
+                    key.isAccentKey -> Color.parseColor("#50FA7B")
+                    else -> Color.parseColor("#F8F8F2")
+                }
+                setTextColor(textColor)
+
+                val bgColor = if (key.isActionKey) Color.parseColor("#282A36") else Color.parseColor("#21222C")
+                val shapeDrawable = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = 6 * density
+                    setColor(bgColor)
+                    setStroke((1 * density).toInt(), Color.parseColor("#44475A"))
+                }
+                background = shapeDrawable
+
+                val params = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    heightPx
+                ).apply {
+                    setMargins(marginPx, 0, marginPx, 0)
+                }
+                layoutParams = params
+
+                setOnClickListener {
+                    performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                    key.action()
+                }
+            }
+            keysLayout.addView(btn)
         }
     }
 

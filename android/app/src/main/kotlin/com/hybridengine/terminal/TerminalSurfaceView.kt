@@ -45,8 +45,21 @@ class TerminalSurfaceView @JvmOverloads constructor(
 
     // Active inline input state
     var currentInputBuffer: String = ""
+    var cursorPosition: Int = 0
     var onCommandSubmitted: ((String) -> Unit)? = null
-    private val promptText = "root@voidterm:~# "
+    private val promptText = "voidterm:$ "
+
+    // Command history
+    private val commandHistory = mutableListOf<String>()
+    private var historyIndex = -1
+
+    // Touch and Scroll tracking
+    private var currentScrollOffset = 0f
+    private var maxScrollOffset = 0f
+    private var isUserScrolled = false
+    private var lastTouchY = 0f
+    private var isDragging = false
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
     private val backgroundPaint = Paint().apply {
         color = config.theme.background
@@ -106,11 +119,40 @@ class TerminalSurfaceView @JvmOverloads constructor(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         scaleGestureDetector.onTouchEvent(event)
+        if (scaleGestureDetector.isInProgress || event.pointerCount > 1) {
+            isDragging = false
+            return true
+        }
 
-        if (event.action == MotionEvent.ACTION_UP && !isScaling) {
-            requestFocus()
-            val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
-            imm?.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                lastTouchY = event.y
+                isDragging = false
+            }
+            MotionEvent.ACTION_MOVE -> {
+                val deltaY = event.y - lastTouchY
+                if (!isDragging && Math.abs(deltaY) > touchSlop) {
+                    isDragging = true
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                if (isDragging) {
+                    lastTouchY = event.y
+                    synchronized(this) {
+                        currentScrollOffset = (currentScrollOffset - deltaY).coerceIn(0f, maxScrollOffset)
+                        // If user scrolled within 20px of bottom, resume auto-scrolling
+                        isUserScrolled = currentScrollOffset < (maxScrollOffset - 20f)
+                    }
+                    triggerRender()
+                }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (!isDragging && !isScaling) {
+                    requestFocus()
+                    val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+                    imm?.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
+                }
+                isDragging = false
+            }
         }
         return true
     }
@@ -126,18 +168,24 @@ class TerminalSurfaceView @JvmOverloads constructor(
                         if (ch == '\n') {
                             submitCurrentBuffer()
                         } else {
-                            currentInputBuffer += ch
+                            val pos = cursorPosition.coerceIn(0, currentInputBuffer.length)
+                            currentInputBuffer = currentInputBuffer.substring(0, pos) + ch + currentInputBuffer.substring(pos)
+                            cursorPosition = pos + 1
                         }
                     }
+                    isUserScrolled = false
                     triggerRender()
                 }
                 return true
             }
 
             override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
-                if (beforeLength > 0 && currentInputBuffer.isNotEmpty()) {
-                    val dropCount = beforeLength.coerceAtMost(currentInputBuffer.length)
-                    currentInputBuffer = currentInputBuffer.dropLast(dropCount)
+                val pos = cursorPosition.coerceIn(0, currentInputBuffer.length)
+                if (beforeLength > 0 && pos > 0) {
+                    val dropCount = beforeLength.coerceAtMost(pos)
+                    currentInputBuffer = currentInputBuffer.substring(0, pos - dropCount) + currentInputBuffer.substring(pos)
+                    cursorPosition = pos - dropCount
+                    isUserScrolled = false
                     triggerRender()
                     return true
                 }
@@ -150,10 +198,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
                         submitCurrentBuffer()
                         return true
                     } else if (event.keyCode == KeyEvent.KEYCODE_DEL) {
-                        if (currentInputBuffer.isNotEmpty()) {
-                            currentInputBuffer = currentInputBuffer.dropLast(1)
-                            triggerRender()
-                        }
+                        deleteLastChar()
                         return true
                     }
                 }
@@ -169,17 +214,33 @@ class TerminalSurfaceView @JvmOverloads constructor(
                 return true
             }
             KeyEvent.KEYCODE_DEL -> {
-                if (currentInputBuffer.isNotEmpty()) {
-                    currentInputBuffer = currentInputBuffer.dropLast(1)
-                    triggerRender()
-                }
+                deleteLastChar()
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_UP -> {
+                handleHistoryUp()
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_DOWN -> {
+                handleHistoryDown()
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT -> {
+                moveCursorLeft()
+                return true
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                moveCursorRight()
+                return true
+            }
+            KeyEvent.KEYCODE_TAB -> {
+                handleTabCompletion()
                 return true
             }
             else -> {
                 val unicodeChar = event.getUnicodeChar(event.metaState)
                 if (unicodeChar != 0 && !Character.isISOControl(unicodeChar)) {
-                    currentInputBuffer += unicodeChar.toChar()
-                    triggerRender()
+                    insertText(unicodeChar.toChar().toString())
                     return true
                 }
             }
@@ -190,6 +251,12 @@ class TerminalSurfaceView @JvmOverloads constructor(
     private fun submitCurrentBuffer() {
         val command = currentInputBuffer
         currentInputBuffer = ""
+        cursorPosition = 0
+        if (command.isNotBlank()) {
+            commandHistory.add(command)
+        }
+        historyIndex = -1
+        isUserScrolled = false
 
         // Echo the executed command locally into terminal history
         val echoLine = "$promptText$command"
@@ -201,9 +268,130 @@ class TerminalSurfaceView @JvmOverloads constructor(
             }
         }
 
-        // Dispatch command to Rust Broker -> Debian microVM vsock
+        // Dispatch command to Broker
         onCommandSubmitted?.invoke(command)
         triggerRender()
+    }
+
+    fun insertText(text: String) {
+        val pos = cursorPosition.coerceIn(0, currentInputBuffer.length)
+        currentInputBuffer = currentInputBuffer.substring(0, pos) + text + currentInputBuffer.substring(pos)
+        cursorPosition = pos + text.length
+        isUserScrolled = false
+        triggerRender()
+    }
+
+    fun deleteLastChar() {
+        val pos = cursorPosition.coerceIn(0, currentInputBuffer.length)
+        if (pos > 0) {
+            currentInputBuffer = currentInputBuffer.substring(0, pos - 1) + currentInputBuffer.substring(pos)
+            cursorPosition = pos - 1
+            isUserScrolled = false
+            triggerRender()
+        }
+    }
+
+    fun moveCursorLeft() {
+        if (cursorPosition > 0) {
+            cursorPosition--
+            isUserScrolled = false
+            triggerRender()
+        }
+    }
+
+    fun moveCursorRight() {
+        if (cursorPosition < currentInputBuffer.length) {
+            cursorPosition++
+            isUserScrolled = false
+            triggerRender()
+        }
+    }
+
+    fun clearScreen() {
+        synchronized(terminalLines) {
+            terminalLines.clear()
+        }
+        currentScrollOffset = 0f
+        isUserScrolled = false
+        triggerRender()
+    }
+
+    fun handleCtrlC() {
+        val line = "$promptText$currentInputBuffer^C"
+        currentInputBuffer = ""
+        cursorPosition = 0
+        historyIndex = -1
+        isUserScrolled = false
+        val styled = ansiParser.parse(line)
+        synchronized(terminalLines) {
+            terminalLines.add(styled)
+        }
+        triggerRender()
+    }
+
+    fun handleHistoryUp() {
+        if (commandHistory.isNotEmpty()) {
+            if (historyIndex < commandHistory.size - 1) {
+                historyIndex++
+                currentInputBuffer = commandHistory[commandHistory.size - 1 - historyIndex]
+                cursorPosition = currentInputBuffer.length
+                isUserScrolled = false
+                triggerRender()
+            }
+        }
+    }
+
+    fun handleHistoryDown() {
+        if (historyIndex > 0) {
+            historyIndex--
+            currentInputBuffer = commandHistory[commandHistory.size - 1 - historyIndex]
+            cursorPosition = currentInputBuffer.length
+            isUserScrolled = false
+            triggerRender()
+        } else if (historyIndex == 0) {
+            historyIndex = -1
+            currentInputBuffer = ""
+            cursorPosition = 0
+            isUserScrolled = false
+            triggerRender()
+        }
+    }
+
+    fun handleTabCompletion() {
+        if (currentInputBuffer.isEmpty()) {
+            insertText("    ")
+            return
+        }
+        val pos = cursorPosition.coerceIn(0, currentInputBuffer.length)
+        val textBefore = currentInputBuffer.substring(0, pos)
+        val lastDelim = textBefore.lastIndexOfAny(charArrayOf(' ', '/', '|', '&', ';'))
+        val token = if (lastDelim >= 0) textBefore.substring(lastDelim + 1) else textBefore
+        if (token.isEmpty()) {
+            insertText(" ")
+            return
+        }
+
+        val binDir = java.io.File(context.filesDir, "usr/bin")
+        val homeDir = java.io.File(context.filesDir, "home")
+        val candidates = mutableSetOf<String>()
+        binDir.list()?.let { candidates.addAll(it) }
+        homeDir.list()?.let { candidates.addAll(it) }
+
+        val matches = candidates.filter { it.startsWith(token) }.sorted()
+        if (matches.size == 1) {
+            val suffix = matches.first().substring(token.length) + " "
+            insertText(suffix)
+        } else if (matches.size > 1) {
+            var prefix = matches.first()
+            for (m in matches) {
+                prefix = prefix.commonPrefixWith(m)
+            }
+            if (prefix.length > token.length) {
+                insertText(prefix.substring(token.length))
+            } else {
+                appendOutput("\r\n\u001b[36m" + matches.joinToString("  ") + "\u001b[0m\r\n")
+            }
+        }
     }
 
     /**
@@ -354,15 +542,19 @@ class TerminalSurfaceView @JvmOverloads constructor(
             Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
         )
 
-        // Append current typed buffer
-        val inputStart = spannableBuilder.length
-        spannableBuilder.append(currentInputBuffer)
-        val inputEnd = spannableBuilder.length
-        if (inputEnd > inputStart) {
+        // Append current typed buffer with cursor placed at cursorPosition
+        val safeCursor = cursorPosition.coerceIn(0, currentInputBuffer.length)
+        val beforeCursor = currentInputBuffer.substring(0, safeCursor)
+        val afterCursor = currentInputBuffer.substring(safeCursor)
+
+        val beforeStart = spannableBuilder.length
+        spannableBuilder.append(beforeCursor)
+        val beforeEnd = spannableBuilder.length
+        if (beforeEnd > beforeStart) {
             spannableBuilder.setSpan(
                 ForegroundColorSpan(config.theme.foreground),
-                inputStart,
-                inputEnd,
+                beforeStart,
+                beforeEnd,
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
             )
         }
@@ -383,6 +575,18 @@ class TerminalSurfaceView @JvmOverloads constructor(
             cursorEnd,
             Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
         )
+
+        val afterStart = spannableBuilder.length
+        spannableBuilder.append(afterCursor)
+        val afterEnd = spannableBuilder.length
+        if (afterEnd > afterStart) {
+            spannableBuilder.setSpan(
+                ForegroundColorSpan(config.theme.foreground),
+                afterStart,
+                afterEnd,
+                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
 
         // 4. Construct StaticLayout for native word wrapping and multi-line rendering
         textPaint.textSize = currentTextSize
@@ -405,14 +609,21 @@ class TerminalSurfaceView @JvmOverloads constructor(
             )
         }
 
-        // 5. Calculate vertical scroll offset to keep latest active prompt in view
+        // 5. Calculate vertical scroll offset (supports user drag scroll + auto-scroll)
         val layoutHeight = staticLayout.height.toFloat()
         val visibleHeight = height.toFloat() - (paddingY * 2)
-        val scrollOffsetY = if (layoutHeight > visibleHeight) layoutHeight - visibleHeight else 0f
+        val maxScroll = (layoutHeight - visibleHeight).coerceAtLeast(0f)
+        maxScrollOffset = maxScroll
+
+        if (!isUserScrolled) {
+            currentScrollOffset = maxScroll
+        } else {
+            currentScrollOffset = currentScrollOffset.coerceIn(0f, maxScroll)
+        }
 
         // 6. Draw the word-wrapped layout to the canvas
         canvas.save()
-        canvas.translate(paddingX, paddingY - scrollOffsetY)
+        canvas.translate(paddingX, paddingY - currentScrollOffset)
         staticLayout.draw(canvas)
         canvas.restore()
     }
