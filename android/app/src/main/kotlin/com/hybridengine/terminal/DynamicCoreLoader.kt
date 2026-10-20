@@ -47,10 +47,10 @@ object DynamicCoreLoader {
             File(usrBin, "void"),
             """
             #!/system/bin/sh
-            case "$1" in
+            case "${'$'}1" in
               "pkg")
                 shift
-                echo "\033[36m[VoidPkg]\033[0m Package directive: $*"
+                echo "\033[36m[VoidPkg]\033[0m Package directive: ${'$'}*"
                 ;;
               "reload")
                 echo "\033[35m[VoidTerm]\033[0m Broadcasting RELOAD_CORE intent..."
@@ -58,8 +58,8 @@ object DynamicCoreLoader {
                 ;;
               "status")
                 echo "\033[32m[VoidTerm Status]\033[0m"
-                echo "  Kernel: $(uname -a)"
-                echo "  User: $(id)"
+                echo "  Kernel: ${'$'}(uname -a)"
+                echo "  User: ${'$'}(id)"
                 echo "  Prefix: ${'$'}PREFIX"
                 echo "  Home: ${'$'}HOME"
                 ;;
@@ -77,14 +77,14 @@ object DynamicCoreLoader {
             File(usrBin, "pkg"),
             """
             #!/system/bin/sh
-            ACTION="$1"
-            PKG="$2"
-            case "$ACTION" in
+            ACTION="${'$'}1"
+            PKG="${'$'}2"
+            case "${'$'}ACTION" in
               "update"|"upgrade")
-                echo "\033[36m[VoidPkg]\033[0m Updating package: $PKG"
+                echo "\033[36m[VoidPkg]\033[0m Updating package: ${'$'}PKG"
                 ;;
               "install"|"add")
-                echo "\033[32m[VoidPkg]\033[0m Installing package: $PKG"
+                echo "\033[32m[VoidPkg]\033[0m Installing package: ${'$'}PKG"
                 ;;
               "list")
                 echo "\033[33m[VoidPkg Installed Packages]\033[0m"
@@ -114,7 +114,7 @@ object DynamicCoreLoader {
             #!/system/bin/sh
             echo "\033[36m=== VoidFS Linux Kernel Architecture ===\033[0m"
             echo "Mount Namespaces: Supported (CLONE_NEWNS)"
-            echo "OverlayFS Status: $(grep overlay /proc/filesystems || echo 'unavailable')"
+            echo "OverlayFS Status: ${'$'}(grep overlay /proc/filesystems || echo 'unavailable')"
             echo "Active Mounts:"
             grep -E "overlay|tmpfs|debian" /proc/mounts || echo "  (Standard POSIX sandbox mounts active)"
             echo "Storage Bridge: /sdcard/VoidTerm -> ${'$'}HOME/sdcard"

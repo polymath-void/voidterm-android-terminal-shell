@@ -57,7 +57,7 @@ class LocalProcessSession(
                 try {
                     val reader = BufferedReader(InputStreamReader(proc.inputStream, Charsets.UTF_8))
                     val buffer = CharArray(1024)
-                    var readChars: Int
+                    var readChars = 0
                     while (isRunning && reader.read(buffer).also { readChars = it } != -1) {
                         onOutput(String(buffer, 0, readChars))
                     }
@@ -71,7 +71,7 @@ class LocalProcessSession(
                 try {
                     val reader = BufferedReader(InputStreamReader(proc.errorStream, Charsets.UTF_8))
                     val buffer = CharArray(1024)
-                    var readChars: Int
+                    var readChars = 0
                     while (isRunning && reader.read(buffer).also { readChars = it } != -1) {
                         onOutput(String(buffer, 0, readChars))
                     }
