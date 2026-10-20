@@ -1,6 +1,7 @@
 package com.hybridengine.terminal
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import java.io.BufferedReader
 import java.io.File
@@ -14,23 +15,26 @@ import java.util.concurrent.Executors
  */
 class LocalProcessSession(
     private val context: Context,
-    private val voidFS: VoidFS,
+    val voidFS: VoidFS,
     private val onOutput: (String) -> Unit
 ) {
     private var process: Process? = null
     private var stdinWriter: OutputStreamWriter? = null
     private val ioExecutor = Executors.newFixedThreadPool(2)
     @Volatile private var isRunning = false
+    private var lastWorkingDir: String = voidFS.homeDir.absolutePath
 
     fun start(workingDir: File = voidFS.homeDir) {
         if (isRunning && process?.isAlive == true) return
 
         val shellBinary = resolveDefaultShell()
-        Log.i(TAG, "Starting shell process: $shellBinary in ${workingDir.absolutePath}")
+        val dir = if (workingDir.exists()) workingDir else context.filesDir
+        lastWorkingDir = dir.absolutePath
+        Log.i(TAG, "Starting shell process: $shellBinary in ${dir.absolutePath}")
 
         val commandList = voidFS.buildExecutionCommand(shellBinary)
         val pb = ProcessBuilder(commandList)
-        pb.directory(if (workingDir.exists()) workingDir else context.filesDir)
+        pb.directory(dir)
 
         val env = pb.environment()
         val filesPath = context.filesDir.absolutePath
@@ -45,13 +49,15 @@ class LocalProcessSession(
         env["TERM"] = "xterm-256color"
         env["SHELL"] = shellBinary
         env["LD_LIBRARY_PATH"] = "$usrPath/lib"
-        env["PATH"] = "$usrPath/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
+        env["PATH"] = "$usrPath/bin:/system/bin:/system/xbin"
         env["VOIDTERM_VERSION"] = "1.0.0-alpha"
 
         // Ensure executable permissions on all usr/bin scripts
         File(usrPath, "bin").listFiles()?.forEach { file ->
-            file.setExecutable(true, false)
-            file.setReadable(true, false)
+            try {
+                file.setExecutable(true, false)
+                file.setReadable(true, false)
+            } catch (_: Exception) {}
         }
 
         try {
@@ -103,7 +109,7 @@ class LocalProcessSession(
         val writer = stdinWriter
         if (writer == null || process?.isAlive != true) {
             // Auto-restart if exited
-            start()
+            start(File(lastWorkingDir))
         }
         try {
             stdinWriter?.apply {
@@ -119,9 +125,48 @@ class LocalProcessSession(
         }
     }
 
+    fun getWorkingDir(): String {
+        val proc = process ?: return lastWorkingDir
+        val pid = getProcessPid(proc) ?: return lastWorkingDir
+        return try {
+            val cwdFile = File("/proc/$pid/cwd")
+            if (cwdFile.exists()) {
+                val realPath = cwdFile.canonicalPath
+                lastWorkingDir = realPath
+                realPath
+            } else {
+                lastWorkingDir
+            }
+        } catch (_: Exception) {
+            lastWorkingDir
+        }
+    }
+
+    fun getProcessPid(proc: Process): Int? {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                proc.pid().toInt()
+            } else {
+                val field = proc.javaClass.getDeclaredField("pid")
+                field.isAccessible = true
+                field.getInt(proc)
+            }
+        } catch (_: Exception) {
+            try {
+                val field = proc.javaClass.getDeclaredField("pid")
+                field.isAccessible = true
+                field.getInt(proc)
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
+    fun isAlive(): Boolean = isRunning && process?.isAlive == true
+
     fun restart() {
         destroy()
-        start()
+        start(File(lastWorkingDir))
     }
 
     fun destroy() {

@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.graphics.text.LineBreaker
 import android.os.Build
 import android.text.InputType
 import android.text.Layout
@@ -12,6 +13,7 @@ import android.text.Spannable
 import android.text.SpannableStringBuilder
 import android.text.StaticLayout
 import android.text.TextPaint
+import android.text.style.BackgroundColorSpan
 import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
 import android.util.AttributeSet
@@ -45,11 +47,34 @@ class TerminalSurfaceView @JvmOverloads constructor(
     var config: TerminalConfig = TerminalConfig(context)
         private set
 
+    // Dynamic prompt state
+    var currentWorkingDirectory: String = "~"
+        private set
+    var promptText: String = "voidterm:~$ "
+        private set
+
+    // Sticky modifier keys
+    var isCtrlActive: Boolean = false
+        set(value) {
+            field = value
+            onModifierStateChanged?.invoke()
+        }
+    var isAltActive: Boolean = false
+        set(value) {
+            field = value
+            onModifierStateChanged?.invoke()
+        }
+    var isShiftActive: Boolean = false
+        set(value) {
+            field = value
+            onModifierStateChanged?.invoke()
+        }
+    var onModifierStateChanged: (() -> Unit)? = null
+
     // Active inline input state
     var currentInputBuffer: String = ""
     var cursorPosition: Int = 0
     var onCommandSubmitted: ((String) -> Unit)? = null
-    private val promptText = "voidterm:$ "
 
     // Command history
     private val commandHistory = mutableListOf<String>()
@@ -119,6 +144,71 @@ class TerminalSurfaceView @JvmOverloads constructor(
         applyConfig(TerminalConfig(context))
     }
 
+    fun updatePrompt(cwd: String, homeDir: String) {
+        val displayPath = when {
+            cwd == homeDir -> "~"
+            cwd.startsWith("$homeDir/") -> "~" + cwd.removePrefix(homeDir)
+            cwd == "/storage/emulated/0" -> "~/storage/shared"
+            cwd.startsWith("/storage/emulated/0/") -> "~/storage/shared" + cwd.removePrefix("/storage/emulated/0")
+            else -> cwd
+        }
+        currentWorkingDirectory = displayPath
+        promptText = "voidterm:$displayPath$ "
+        triggerRender()
+    }
+
+    fun setTerminalLines(lines: List<List<AnsiParser.StyledText>>) {
+        synchronized(terminalLines) {
+            terminalLines.clear()
+            terminalLines.addAll(lines)
+        }
+        triggerRender()
+    }
+
+    fun getTerminalLines(): List<List<AnsiParser.StyledText>> {
+        synchronized(terminalLines) {
+            return terminalLines.toList()
+        }
+    }
+
+    fun setInputState(buffer: String, cursor: Int) {
+        currentInputBuffer = buffer
+        cursorPosition = cursor.coerceIn(0, buffer.length)
+        triggerRender()
+    }
+
+    fun getScrollOffset(): Float = currentScrollOffset
+
+    fun setScrollOffset(offset: Float) {
+        currentScrollOffset = offset
+        triggerRender()
+    }
+
+    fun setCursorToStart() {
+        cursorPosition = 0
+        isUserScrolled = false
+        triggerRender()
+    }
+
+    fun setCursorToEnd() {
+        cursorPosition = currentInputBuffer.length
+        isUserScrolled = false
+        triggerRender()
+    }
+
+    fun copyAllText(): String {
+        val sb = StringBuilder()
+        synchronized(terminalLines) {
+            for (line in terminalLines) {
+                for (segment in line) {
+                    sb.append(segment.text)
+                }
+                sb.append("\n")
+            }
+        }
+        return sb.toString().trimEnd()
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         scaleGestureDetector.onTouchEvent(event)
         if (scaleGestureDetector.isInProgress || event.pointerCount > 1) {
@@ -141,7 +231,6 @@ class TerminalSurfaceView @JvmOverloads constructor(
                     lastTouchY = event.y
                     synchronized(this) {
                         currentScrollOffset = (currentScrollOffset - deltaY).coerceIn(0f, maxScrollOffset)
-                        // If user scrolled within 20px of bottom, resume auto-scrolling
                         isUserScrolled = currentScrollOffset < (maxScrollOffset - 20f)
                     }
                     triggerRender()
@@ -167,12 +256,13 @@ class TerminalSurfaceView @JvmOverloads constructor(
             override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
                 if (text != null) {
                     for (ch in text) {
+                        if (handleModifiersForChar(ch)) {
+                            continue
+                        }
                         if (ch == '\n') {
                             submitCurrentBuffer()
                         } else {
-                            val pos = cursorPosition.coerceIn(0, currentInputBuffer.length)
-                            currentInputBuffer = currentInputBuffer.substring(0, pos) + ch + currentInputBuffer.substring(pos)
-                            cursorPosition = pos + 1
+                            insertChar(ch)
                         }
                     }
                     isUserScrolled = false
@@ -209,6 +299,60 @@ class TerminalSurfaceView @JvmOverloads constructor(
         }
     }
 
+    private fun handleModifiersForChar(ch: Char): Boolean {
+        if (isCtrlActive) {
+            isCtrlActive = false
+            when (ch.lowercaseChar()) {
+                'c' -> { handleCtrlC(); return true }
+                'd' -> { onCommandSubmitted?.invoke("exit"); return true }
+                'l' -> { clearScreen(); return true }
+                'z' -> { onCommandSubmitted?.invoke("\u001a"); return true }
+                'a' -> { setCursorToStart(); return true }
+                'e' -> { setCursorToEnd(); return true }
+                'u' -> {
+                    val pos = cursorPosition.coerceIn(0, currentInputBuffer.length)
+                    currentInputBuffer = currentInputBuffer.substring(pos)
+                    cursorPosition = 0
+                    triggerRender()
+                    return true
+                }
+                'k' -> {
+                    val pos = cursorPosition.coerceIn(0, currentInputBuffer.length)
+                    currentInputBuffer = currentInputBuffer.substring(0, pos)
+                    triggerRender()
+                    return true
+                }
+                else -> {
+                    val code = ch.uppercaseChar().code - 64
+                    if (code in 1..26) {
+                        onCommandSubmitted?.invoke(code.toChar().toString())
+                        return true
+                    }
+                }
+            }
+        }
+
+        if (isAltActive) {
+            isAltActive = false
+            onCommandSubmitted?.invoke("\u001b$ch")
+            return true
+        }
+
+        if (isShiftActive) {
+            isShiftActive = false
+            insertChar(ch.uppercaseChar())
+            return true
+        }
+
+        return false
+    }
+
+    private fun insertChar(ch: Char) {
+        val pos = cursorPosition.coerceIn(0, currentInputBuffer.length)
+        currentInputBuffer = currentInputBuffer.substring(0, pos) + ch + currentInputBuffer.substring(pos)
+        cursorPosition = pos + 1
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         when (keyCode) {
             KeyEvent.KEYCODE_ENTER -> {
@@ -242,7 +386,10 @@ class TerminalSurfaceView @JvmOverloads constructor(
             else -> {
                 val unicodeChar = event.getUnicodeChar(event.metaState)
                 if (unicodeChar != 0 && !Character.isISOControl(unicodeChar)) {
-                    insertText(unicodeChar.toChar().toString())
+                    val ch = unicodeChar.toChar()
+                    if (!handleModifiersForChar(ch)) {
+                        insertText(ch.toString())
+                    }
                     return true
                 }
             }
@@ -250,7 +397,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
         return super.onKeyDown(keyCode, event)
     }
 
-    private fun submitCurrentBuffer() {
+    fun submitCurrentBuffer() {
         val command = currentInputBuffer
         currentInputBuffer = ""
         cursorPosition = 0
@@ -260,7 +407,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
         historyIndex = -1
         isUserScrolled = false
 
-        // Echo the executed command locally into terminal history
+        // Echo executed command locally into terminal history with dynamic prompt
         val echoLine = "$promptText$command"
         val styledEcho = ansiParser.parse(echoLine)
         synchronized(terminalLines) {
@@ -270,7 +417,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
             }
         }
 
-        // Dispatch command to Broker
+        // Dispatch command to Broker / Session
         onCommandSubmitted?.invoke(command)
         triggerRender()
     }
@@ -328,6 +475,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
         synchronized(terminalLines) {
             terminalLines.add(styled)
         }
+        onCommandSubmitted?.invoke("\u0003")
         triggerRender()
     }
 
@@ -397,14 +545,12 @@ class TerminalSurfaceView @JvmOverloads constructor(
     }
 
     /**
-     * Safely appends and parses new terminal output from the Broker.
+     * Safely appends and parses new terminal output.
      */
     fun appendOutput(rawOutput: String) {
         val styledLines = ansiParser.parseLines(rawOutput)
         synchronized(terminalLines) {
             terminalLines.addAll(styledLines)
-
-            // Bound memory buffer to 1000 lines
             if (terminalLines.size > 1000) {
                 terminalLines.subList(0, terminalLines.size - 1000).clear()
             }
@@ -425,7 +571,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
         isRunning = false
         try {
             drawingThread?.join(500)
-        } catch (e: InterruptedException) {
+        } catch (_: InterruptedException) {
             Log.w("VoidTerm", "Drawing thread join interrupted")
         }
     }
@@ -447,7 +593,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
         }
     }
 
-    private fun triggerRender() {
+    fun triggerRender() {
         if (holder.surface.isValid) {
             renderFrame()
         }
@@ -490,7 +636,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
         val paddingY = 24f
         val layoutWidth = (width - (paddingX * 2).toInt()).coerceAtLeast(100)
 
-        // 2. Build styled Spannable buffer with ANSI formatting + Active Inline Input Prompt
+        // 2. Build styled Spannable buffer with ANSI formatting + Markdown highlighting
         val spannableBuilder = SpannableStringBuilder()
         synchronized(terminalLines) {
             for ((lineIndex, lineBlocks) in terminalLines.withIndex()) {
@@ -515,6 +661,24 @@ class TerminalSurfaceView @JvmOverloads constructor(
                                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
                             )
                         }
+
+                        if (block.backgroundColor != null) {
+                            spannableBuilder.setSpan(
+                                BackgroundColorSpan(block.backgroundColor),
+                                start,
+                                end,
+                                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                            )
+                        }
+
+                        if (block.isItalic) {
+                            spannableBuilder.setSpan(
+                                StyleSpan(Typeface.ITALIC),
+                                start,
+                                end,
+                                Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                            )
+                        }
                     }
                 }
                 if (lineIndex < terminalLines.size - 1) {
@@ -523,7 +687,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
             }
         }
 
-        // 3. Append active prompt, user input buffer, and blinking cursor
+        // 3. Append active dynamic prompt, user input buffer, and blinking cursor
         if (spannableBuilder.isNotEmpty()) {
             spannableBuilder.append("\n")
         }
@@ -561,7 +725,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
             )
         }
 
-        // Configurable cursor shape & 500ms blinking timer
+        // Blinking cursor
         val isCursorVisible = if (config.cursorBlink) {
             (System.currentTimeMillis() / 500) % 2 == 0L
         } else {
@@ -590,14 +754,19 @@ class TerminalSurfaceView @JvmOverloads constructor(
             )
         }
 
-        // 4. Construct StaticLayout for native word wrapping and multi-line rendering
+        // 4. Construct StaticLayout with character wrapping & no hyphens
         textPaint.textSize = currentTextSize
         val staticLayout: StaticLayout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            StaticLayout.Builder.obtain(spannableBuilder, 0, spannableBuilder.length, textPaint, layoutWidth)
+            val builder = StaticLayout.Builder.obtain(spannableBuilder, 0, spannableBuilder.length, textPaint, layoutWidth)
                 .setAlignment(Layout.Alignment.ALIGN_NORMAL)
                 .setLineSpacing(0f, 1.15f)
                 .setIncludePad(false)
-                .build()
+                .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                builder.setBreakStrategy(LineBreaker.BREAK_STRATEGY_SIMPLE)
+            }
+            builder.build()
         } else {
             @Suppress("DEPRECATION")
             StaticLayout(
@@ -623,7 +792,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
             currentScrollOffset = currentScrollOffset.coerceIn(0f, maxScroll)
         }
 
-        // 6. Draw the word-wrapped layout to the canvas
+        // 6. Draw the layout to the canvas
         canvas.save()
         canvas.translate(paddingX, paddingY - currentScrollOffset)
         staticLayout.draw(canvas)

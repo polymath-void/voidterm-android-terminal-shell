@@ -8,7 +8,7 @@ import java.io.FileOutputStream
 
 /**
  * DynamicCoreLoader: Manages the instant-editable POSIX filesystem hierarchy,
- * runtime JSON configurations, and dynamic CLI commands.
+ * DNS resolver configuration, standard Linux coreutils applets, and runtime JSON configurations.
  */
 object DynamicCoreLoader {
 
@@ -19,6 +19,7 @@ object DynamicCoreLoader {
         val filesDir = context.filesDir
         val usrBin = File(filesDir, "usr/bin").apply { mkdirs() }
         val usrEtc = File(filesDir, "usr/etc").apply { mkdirs() }
+        val usrLib = File(filesDir, "usr/lib").apply { mkdirs() }
         val usrTmp = File(filesDir, "usr/tmp").apply { mkdirs() }
         val homeDir = File(filesDir, "home").apply { mkdirs() }
 
@@ -42,7 +43,35 @@ object DynamicCoreLoader {
             }
         }
 
-        // 2. Deploy starter executable scripts in usr/bin
+        // 2. Deploy DNS Resolver (resolv.conf) & Local Hosts (hosts)
+        val resolvConf = File(usrEtc, "resolv.conf")
+        if (!resolvConf.exists()) {
+            deployFile(
+                resolvConf,
+                """
+                nameserver 8.8.8.8
+                nameserver 1.1.1.1
+                nameserver 2001:4860:4860::8888
+                nameserver 2606:4700:4700::1111
+                """.trimIndent()
+            )
+        }
+
+        val hostsFile = File(usrEtc, "hosts")
+        if (!hostsFile.exists()) {
+            deployFile(
+                hostsFile,
+                """
+                127.0.0.1 localhost loopback
+                ::1 localhost ip6-localhost ip6-loopback
+                """.trimIndent()
+            )
+        }
+
+        // 3. Deploy standard POSIX applets (cat, ls, grep, pwd, ping, ip, ifconfig, etc.)
+        deployBaseApplets(usrBin)
+
+        // 4. Deploy starter executable scripts in usr/bin
         deployScript(
             File(usrBin, "void"),
             """
@@ -225,7 +254,8 @@ object DynamicCoreLoader {
             echo "\033[36m--- VoidTerm Builtin Directives ---\033[0m"
             echo "  void       : Core control script (pkg, reload, status, version)"
             echo "  voidfs     : Inspect VoidFS rootless POSIX architecture"
-            echo "  pkg        : Package manager interface"
+            echo "  pkg        : Package manager interface (voidpkg)"
+            echo "  ipconfig   : View network interfaces and IP addresses"
             echo "  reload     : Hot-reload /files/usr/bin/* scripts and voidterm.json"
             echo "  restart    : Restart the active shell session"
             echo "  storage/   : Access external storage (/sdcard) via ${'$'}HOME/storage"
@@ -246,7 +276,7 @@ object DynamicCoreLoader {
             """.trimIndent()
         )
 
-        // 3. Deploy default .bashrc in home if not present
+        // 5. Deploy default .bashrc in home if not present
         val bashrc = File(homeDir, ".bashrc")
         if (!bashrc.exists()) {
             deployScript(
@@ -268,6 +298,7 @@ object DynamicCoreLoader {
                 alias help="${'$'}PREFIX/bin/help"
                 alias reload="${'$'}PREFIX/bin/reload"
                 alias cls="clear"
+                alias ipconfig="${'$'}PREFIX/bin/ipconfig"
 
                 echo "\033[36m========================================\033[0m"
                 echo "\033[32m✔ VoidTerm Rootless Container v1.0.0\033[0m"
@@ -277,6 +308,78 @@ object DynamicCoreLoader {
                 echo "\033[36m========================================\033[0m"
                 """.trimIndent()
             )
+        }
+    }
+
+    private fun deployBaseApplets(usrBin: File) {
+        val toybox = File("/system/bin/toybox")
+        val hasToybox = toybox.exists() && toybox.canExecute()
+        val applets = listOf(
+            // Core POSIX file & text utilities
+            "cat", "ls", "cp", "mv", "rm", "mkdir", "rmdir", "touch", "pwd", "echo",
+            "chmod", "chown", "grep", "egrep", "fgrep", "find", "sed", "awk", "head",
+            "tail", "wc", "which", "uname", "whoami", "id", "date", "env", "printenv",
+            "sleep", "kill", "killall", "ps", "top", "df", "du", "tar", "gzip", "gunzip",
+            "clear", "cut", "sort", "uniq", "diff", "cmp", "file", "strings",
+            "stat", "readlink", "realpath", "basename", "dirname", "tee", "xargs",
+            "base64", "md5sum", "sha256sum", "test", "true", "false", "yes", "uptime",
+            // Networking utilities
+            "ifconfig", "ip", "ping", "netstat", "nc", "traceroute"
+        )
+
+        for (app in applets) {
+            val dest = File(usrBin, app)
+            if (!dest.exists()) {
+                val sysBin = File("/system/bin/$app")
+                val target = when {
+                    sysBin.exists() && sysBin.canExecute() -> sysBin.absolutePath
+                    hasToybox -> toybox.absolutePath
+                    else -> null
+                }
+                if (target != null) {
+                    try {
+                        android.system.Os.symlink(target, dest.absolutePath)
+                    } catch (e: Exception) {
+                        try {
+                            dest.writeText("#!/system/bin/sh\nexec $target $app \"\$@\"\n")
+                            dest.setExecutable(true, false)
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
+        }
+
+        // Deploy ipconfig script alias
+        val ipconfig = File(usrBin, "ipconfig")
+        if (!ipconfig.exists()) {
+            try {
+                ipconfig.writeText(
+                    """
+                    #!/system/bin/sh
+                    # VoidTerm ipconfig utility
+                    if [ -x "/system/bin/ifconfig" ]; then
+                      /system/bin/ifconfig "$@"
+                    elif [ -x "/system/bin/toybox" ]; then
+                      /system/bin/toybox ifconfig "$@"
+                    else
+                      ip addr show "$@"
+                    fi
+                    """.trimIndent()
+                )
+                ipconfig.setExecutable(true, false)
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun deployFile(file: File, content: String) {
+        if (!file.exists()) {
+            try {
+                FileOutputStream(file).use {
+                    it.write(content.toByteArray(Charsets.UTF_8))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deploying file ${file.name}: ${e.message}")
+            }
         }
     }
 
@@ -313,8 +416,10 @@ object DynamicCoreLoader {
         val usrBin = File(context.filesDir, "usr/bin")
         if (usrBin.exists()) {
             usrBin.listFiles()?.forEach { file ->
-                file.setExecutable(true, false)
-                file.setReadable(true, false)
+                try {
+                    file.setExecutable(true, false)
+                    file.setReadable(true, false)
+                } catch (_: Exception) {}
             }
         }
         onConfigReloaded?.invoke()

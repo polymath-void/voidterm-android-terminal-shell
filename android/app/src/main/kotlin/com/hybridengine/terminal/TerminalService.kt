@@ -23,6 +23,8 @@ class TerminalService : Service() {
         private set
     lateinit var voidFS: VoidFS
         private set
+    lateinit var sessionManager: SessionManager
+        private set
 
     private var isEngineStarted = false
     private var wakeLock: PowerManager.WakeLock? = null
@@ -54,12 +56,19 @@ class TerminalService : Service() {
         voidFS = VoidFS(this)
         voidFS.setupFilesystem()
 
-        // 3. Initialize Broker and LocalProcessSession
+        // 3. Initialize SessionManager and Broker
+        sessionManager = SessionManager(this, voidFS)
         broker = Broker(this)
-        val session = LocalProcessSession(this, voidFS) { output ->
-            broker.onTerminalOutput(output)
+
+        sessionManager.onSessionOutput = { tab, output ->
+            if (tab == sessionManager.getActiveSession()) {
+                broker.onTerminalOutput(output)
+            }
         }
-        broker.localSession = session
+
+        // Start initial tab session
+        val initialTab = sessionManager.createSession("Tab 1")
+        broker.localSession = initialTab.processSession
 
         vmManager = VmManager(this)
     }
@@ -96,7 +105,10 @@ class TerminalService : Service() {
     }
 
     fun executeCommand(command: String) {
-        if (::broker.isInitialized) {
+        val active = if (::sessionManager.isInitialized) sessionManager.getActiveSession() else null
+        if (active != null) {
+            active.processSession.write(command)
+        } else if (::broker.isInitialized) {
             broker.send(command)
         }
     }
@@ -184,6 +196,11 @@ class TerminalService : Service() {
 
     fun shutdownEngine() {
         try {
+            if (::sessionManager.isInitialized) {
+                sessionManager.destroyAll()
+            }
+        } catch (_: Throwable) {}
+        try {
             broker.localSession?.destroy()
         } catch (_: Throwable) {}
 
@@ -216,6 +233,11 @@ class TerminalService : Service() {
             Log.w(TAG, "Error releasing wakeLock: ${e.message}")
         }
 
+        try {
+            if (::sessionManager.isInitialized) {
+                sessionManager.destroyAll()
+            }
+        } catch (_: Throwable) {}
         try {
             broker.localSession?.destroy()
         } catch (_: Throwable) {}

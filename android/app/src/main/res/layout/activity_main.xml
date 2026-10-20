@@ -5,12 +5,57 @@
     android:layout_height="match_parent"
     android:background="#0A0A0A">
 
+    <!-- Top Tab Bar Container -->
+    <LinearLayout
+        android:id="@+id/container_tabs"
+        android:layout_width="match_parent"
+        android:layout_height="38dp"
+        android:layout_gravity="top"
+        android:orientation="horizontal"
+        android:background="#181825"
+        android:gravity="center_vertical"
+        android:elevation="6dp">
+
+        <HorizontalScrollView
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:scrollbars="none"
+            android:overScrollMode="never"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:id="@+id/layout_tab_strip"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp" />
+        </HorizontalScrollView>
+
+        <!-- New Tab Button (+) -->
+        <TextView
+            android:id="@+id/btn_add_tab"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:gravity="center"
+            android:text="+"
+            android:textColor="#50FA7B"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="false" />
+    </LinearLayout>
+
     <!-- The Fullscreen Hardware Accelerated Terminal Surface with Native Inline Input -->
     <com.hybridengine.terminal.TerminalSurfaceView
         android:id="@+id/terminal_surface"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_marginBottom="44dp" />
+        android:layout_marginTop="38dp"
+        android:layout_marginBottom="74dp" />
 
     <!-- Agent HUD Floating Overlay Banner -->
     <com.google.android.material.card.MaterialCardView
@@ -20,7 +65,7 @@
         android:layout_gravity="top"
         android:layout_marginStart="16dp"
         android:layout_marginEnd="80dp"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="46dp"
         android:visibility="gone"
         app:cardBackgroundColor="#E61E1E2E"
         app:cardCornerRadius="8dp"
@@ -106,7 +151,9 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|end"
-        android:layout_margin="16dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginTop="46dp"
         android:orientation="vertical"
         android:gravity="center_horizontal">
 
@@ -132,31 +179,56 @@
             app:srcCompat="@android:drawable/ic_btn_speak_now" />
     </LinearLayout>
 
-    <!-- Keyboard Extra Keys Shortcut Toolbar (Termux-style quick bar) -->
+    <!-- Keyboard Extra Keys Shortcut Toolbar (Double-row quick bar) -->
     <LinearLayout
         android:id="@+id/container_keyboard_toolbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:orientation="vertical"
-        android:elevation="6dp">
+        android:elevation="6dp"
+        android:background="#181825">
 
         <View
             android:layout_width="match_parent"
             android:layout_height="1dp"
             android:background="#313244" />
 
+        <!-- Row 1: Actions, Modifiers & Clipboard -->
         <HorizontalScrollView
-            android:id="@+id/keyboard_toolbar"
+            android:id="@+id/keyboard_toolbar_row1"
             android:layout_width="match_parent"
-            android:layout_height="43dp"
-            android:background="#181825"
+            android:layout_height="36dp"
             android:scrollbars="none"
             android:overScrollMode="never"
             android:fillViewport="true">
 
             <LinearLayout
-                android:id="@+id/layout_keyboard_keys"
+                android:id="@+id/layout_keyboard_keys_row1"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp" />
+        </HorizontalScrollView>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="#21222C" />
+
+        <!-- Row 2: Navigation & Common Symbols -->
+        <HorizontalScrollView
+            android:id="@+id/keyboard_toolbar_row2"
+            android:layout_width="match_parent"
+            android:layout_height="36dp"
+            android:scrollbars="none"
+            android:overScrollMode="never"
+            android:fillViewport="true">
+
+            <LinearLayout
+                android:id="@+id/layout_keyboard_keys_row2"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:orientation="horizontal"
