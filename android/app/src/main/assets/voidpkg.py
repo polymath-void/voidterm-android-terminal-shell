@@ -177,9 +177,20 @@ def retarget_elf(filepath):
         with open(filepath, "rb") as f:
             magic = f.read(4)
         if magic == b"\x7fELF":
-            rpath = f"$ORIGIN/../lib:{PREFIX}/lib"
+            rpath = f"$ORIGIN:$ORIGIN/../lib:$ORIGIN/../../:{PREFIX}/lib"
             if os.path.exists(PATCHELF):
-                subprocess.run([PATCHELF, "--set-rpath", rpath, filepath], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                tmp_path = filepath + ".patch_tmp"
+                try:
+                    shutil.copy2(filepath, tmp_path)
+                    res = subprocess.run([PATCHELF, "--set-rpath", rpath, tmp_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    if res.returncode == 0:
+                        os.replace(tmp_path, filepath)
+                    elif os.path.exists(tmp_path):
+                        os.remove(tmp_path)
+                except Exception:
+                    if os.path.exists(tmp_path):
+                        try: os.remove(tmp_path)
+                        except Exception: pass
             os.chmod(filepath, 0o755)
     except Exception:
         pass
@@ -208,6 +219,9 @@ def install_single_pkg(pkg_name, catalog, installed):
         aliases = {
             "ssh": "openssh",
             "python": "python",
+            "python3": "python",
+            "pip": "python-pip",
+            "pip3": "python-pip",
             "vim": "vim",
             "neovim": "neovim",
             "clang": "clang",

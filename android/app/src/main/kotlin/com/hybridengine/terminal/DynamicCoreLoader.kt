@@ -23,6 +23,29 @@ object DynamicCoreLoader {
         val usrTmp = File(filesDir, "usr/tmp").apply { mkdirs() }
         val homeDir = File(filesDir, "home").apply { mkdirs() }
 
+        // Ensure core Bionic system libraries are symlinked if missing (libz.so.1, libz.so)
+        val libz1 = File(usrLib, "libz.so.1")
+        if (!libz1.exists()) {
+            val sysLibz = File("/system/lib64/libz.so")
+            if (sysLibz.exists()) {
+                try {
+                    android.system.Os.symlink(sysLibz.absolutePath, libz1.absolutePath)
+                    Log.i(TAG, "Linked system libz.so to ${libz1.absolutePath}")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Notice linking libz.so.1: ${e.message}")
+                }
+            }
+        }
+        val libz = File(usrLib, "libz.so")
+        if (!libz.exists()) {
+            val sysLibz = File("/system/lib64/libz.so")
+            if (sysLibz.exists()) {
+                try {
+                    android.system.Os.symlink(sysLibz.absolutePath, libz.absolutePath)
+                } catch (_: Exception) {}
+            }
+        }
+
         // 1. Create or load runtime configuration
         val configFile = File(usrEtc, "voidterm.json")
         if (!configFile.exists()) {
