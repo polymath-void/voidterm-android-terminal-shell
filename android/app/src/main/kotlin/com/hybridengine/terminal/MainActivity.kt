@@ -43,6 +43,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var layoutTabStrip: LinearLayout
     private lateinit var btnAddTab: TextView
 
+    // Text Selection Toolbar Views
+    private var cardSelectionBar: View? = null
+
     // Agent HUD Views
     private lateinit var cardAgentHud: MaterialCardView
     private lateinit var textHudBadge: TextView
@@ -134,6 +137,45 @@ class MainActivity : AppCompatActivity() {
         terminalSurface = findViewById(R.id.terminal_surface)
         layoutTabStrip = findViewById(R.id.layout_tab_strip)
         btnAddTab = findViewById(R.id.btn_add_tab)
+
+        cardSelectionBar = findViewById(R.id.card_selection_bar)
+        val btnSelectionCopy = findViewById<View>(R.id.btn_selection_copy)
+        val btnSelectionSelectAll = findViewById<View>(R.id.btn_selection_select_all)
+        val btnSelectionClose = findViewById<View>(R.id.btn_selection_close)
+
+        terminalSurface.onSelectionChanged = { isSelecting, selectedText ->
+            runOnUiThread {
+                if (isSelecting && !selectedText.isNullOrEmpty()) {
+                    cardSelectionBar?.visibility = View.VISIBLE
+                } else {
+                    cardSelectionBar?.visibility = View.GONE
+                }
+            }
+        }
+
+        btnSelectionCopy?.setOnClickListener {
+            it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            val text = terminalSurface.getSelectedText()
+            if (!text.isNullOrEmpty()) {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                val clip = ClipData.newPlainText("VoidTerm", text)
+                clipboard.setPrimaryClip(clip)
+                Toast.makeText(this@MainActivity, "Selection copied", Toast.LENGTH_SHORT).show()
+            }
+            terminalSurface.clearSelection()
+            cardSelectionBar?.visibility = View.GONE
+        }
+
+        btnSelectionSelectAll?.setOnClickListener {
+            it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            terminalSurface.selectAllText()
+        }
+
+        btnSelectionClose?.setOnClickListener {
+            it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            terminalSurface.clearSelection()
+            cardSelectionBar?.visibility = View.GONE
+        }
 
         cardAgentHud = findViewById(R.id.card_agent_hud)
         textHudBadge = findViewById(R.id.text_hud_badge)
@@ -372,12 +414,20 @@ class MainActivity : AppCompatActivity() {
             KeyDef("END", { terminalSurface.setCursorToEnd() }, isAccentKey = true),
             KeyDef("BKSP", { terminalSurface.deleteLastChar() }),
             KeyDef("COPY", {
-                val allText = terminalSurface.copyAllText()
-                if (allText.isNotEmpty()) {
+                val selected = terminalSurface.getSelectedText()
+                val textToCopy = if (!selected.isNullOrEmpty()) {
+                    terminalSurface.clearSelection()
+                    cardSelectionBar?.visibility = View.GONE
+                    selected
+                } else {
+                    terminalSurface.copyAllText()
+                }
+                if (textToCopy.isNotEmpty()) {
                     val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clip = ClipData.newPlainText("VoidTerm", allText)
+                    val clip = ClipData.newPlainText("VoidTerm", textToCopy)
                     clipboard.setPrimaryClip(clip)
-                    Toast.makeText(this@MainActivity, "Terminal output copied", Toast.LENGTH_SHORT).show()
+                    val msg = if (!selected.isNullOrEmpty()) "Selection copied" else "Terminal output copied"
+                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
                 }
             }, isAccentKey = true),
             KeyDef("PASTE", {

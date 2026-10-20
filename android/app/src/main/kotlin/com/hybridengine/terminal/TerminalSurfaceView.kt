@@ -18,6 +18,8 @@ import android.text.style.ForegroundColorSpan
 import android.text.style.StyleSpan
 import android.util.AttributeSet
 import android.util.Log
+import android.view.GestureDetector
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
@@ -29,6 +31,7 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import kotlin.math.abs
+import kotlin.math.hypot
 
 class TerminalSurfaceView @JvmOverloads constructor(
     context: Context,
@@ -70,6 +73,36 @@ class TerminalSurfaceView @JvmOverloads constructor(
             onModifierStateChanged?.invoke()
         }
     var onModifierStateChanged: (() -> Unit)? = null
+
+    // Text Selection Mode & Marker Handles
+    var isSelectionMode: Boolean = false
+        private set
+    var selectionStart: Int = -1
+        private set
+    var selectionEnd: Int = -1
+        private set
+    var onSelectionChanged: ((Boolean, String?) -> Unit)? = null
+
+    private enum class Handle { NONE, START, END }
+    private var activeHandle: Handle = Handle.NONE
+
+    private var startHandleX: Float = 0f
+    private var startHandleY: Float = 0f
+    private var endHandleX: Float = 0f
+    private var endHandleY: Float = 0f
+
+    @Volatile private var cachedLayout: StaticLayout? = null
+    @Volatile private var cachedSpannableText: String = ""
+
+    private val handlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#50FA7B")
+        style = Paint.Style.FILL
+    }
+    private val handleStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#181825")
+        style = Paint.Style.STROKE
+        strokeWidth = 3f
+    }
 
     // Active inline input state
     var currentInputBuffer: String = ""
@@ -119,6 +152,35 @@ class TerminalSurfaceView @JvmOverloads constructor(
 
         override fun onScaleEnd(detector: ScaleGestureDetector) {
             isScaling = false
+        }
+    })
+
+    private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onLongPress(e: MotionEvent) {
+            val layout = cachedLayout ?: return
+            val text = cachedSpannableText
+            if (text.isEmpty()) return
+
+            val targetY = (e.y - 24f + currentScrollOffset).coerceAtLeast(0f).toInt()
+            val targetX = (e.x - 24f).coerceAtLeast(0f)
+            val line = layout.getLineForVertical(targetY)
+            val offset = layout.getOffsetForHorizontal(line, targetX).coerceIn(0, text.length)
+            val (wStart, wEnd) = findWordBounds(text, offset)
+
+            selectionStart = wStart
+            selectionEnd = wEnd
+            isSelectionMode = true
+            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            triggerRender()
+            onSelectionChanged?.invoke(true, getSelectedText())
+        }
+
+        override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+            if (isSelectionMode) {
+                clearSelection()
+                return true
+            }
+            return false
         }
     })
 
@@ -196,6 +258,49 @@ class TerminalSurfaceView @JvmOverloads constructor(
         triggerRender()
     }
 
+    fun getSelectedText(): String? {
+        if (!isSelectionMode || selectionStart < 0 || selectionEnd < 0) return null
+        val text = cachedSpannableText
+        val minPos = minOf(selectionStart, selectionEnd).coerceIn(0, text.length)
+        val maxPos = maxOf(selectionStart, selectionEnd).coerceIn(0, text.length)
+        return if (maxPos > minPos) text.substring(minPos, maxPos) else null
+    }
+
+    fun selectAllText() {
+        val text = cachedSpannableText
+        if (text.isEmpty()) return
+        selectionStart = 0
+        selectionEnd = text.length
+        isSelectionMode = true
+        triggerRender()
+        onSelectionChanged?.invoke(true, getSelectedText())
+    }
+
+    fun clearSelection() {
+        if (isSelectionMode) {
+            isSelectionMode = false
+            selectionStart = -1
+            selectionEnd = -1
+            activeHandle = Handle.NONE
+            triggerRender()
+            onSelectionChanged?.invoke(false, null)
+        }
+    }
+
+    private fun findWordBounds(text: CharSequence, offset: Int): Pair<Int, Int> {
+        if (text.isEmpty() || offset !in 0 until text.length) return Pair(0, 0)
+        var start = offset
+        var end = offset
+        val delims = charArrayOf(' ', '\t', '\n', '\r', '"', '\'', '(', ')', '[', ']', '{', '}', '<', '>')
+        while (start > 0 && text[start - 1] !in delims) {
+            start--
+        }
+        while (end < text.length && text[end] !in delims) {
+            end++
+        }
+        return if (start == end && end < text.length) Pair(start, end + 1) else Pair(start, end)
+    }
+
     fun copyAllText(): String {
         val sb = StringBuilder()
         synchronized(terminalLines) {
@@ -211,11 +316,61 @@ class TerminalSurfaceView @JvmOverloads constructor(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         scaleGestureDetector.onTouchEvent(event)
+        gestureDetector.onTouchEvent(event)
+
         if (scaleGestureDetector.isInProgress || event.pointerCount > 1) {
             isDragging = false
             return true
         }
 
+        val density = resources.displayMetrics.density
+        val handleHitRadius = 32 * density
+
+        // Handle draggable marker handles in selection mode
+        if (isSelectionMode) {
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    val distStart = hypot(event.x - startHandleX, event.y - (startHandleY + 10 * density))
+                    val distEnd = hypot(event.x - endHandleX, event.y - (endHandleY + 10 * density))
+                    if (distStart < handleHitRadius) {
+                        activeHandle = Handle.START
+                        parent?.requestDisallowInterceptTouchEvent(true)
+                        return true
+                    } else if (distEnd < handleHitRadius) {
+                        activeHandle = Handle.END
+                        parent?.requestDisallowInterceptTouchEvent(true)
+                        return true
+                    }
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (activeHandle != Handle.NONE) {
+                        val layout = cachedLayout ?: return true
+                        val text = cachedSpannableText
+                        val targetY = (event.y - 24f + currentScrollOffset).coerceAtLeast(0f).toInt()
+                        val targetX = (event.x - 24f).coerceAtLeast(0f)
+                        val line = layout.getLineForVertical(targetY)
+                        val offset = layout.getOffsetForHorizontal(line, targetX).coerceIn(0, text.length)
+
+                        if (activeHandle == Handle.START) {
+                            selectionStart = offset
+                        } else if (activeHandle == Handle.END) {
+                            selectionEnd = offset
+                        }
+                        triggerRender()
+                        onSelectionChanged?.invoke(true, getSelectedText())
+                        return true
+                    }
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    if (activeHandle != Handle.NONE) {
+                        activeHandle = Handle.NONE
+                        return true
+                    }
+                }
+            }
+        }
+
+        // Standard scrolling & soft-keyboard invocation
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 lastTouchY = event.y
@@ -237,7 +392,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
                 }
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (!isDragging && !isScaling) {
+                if (!isDragging && !isScaling && !isSelectionMode) {
                     requestFocus()
                     val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
                     imm?.showSoftInput(this, InputMethodManager.SHOW_IMPLICIT)
@@ -319,6 +474,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
                 'k' -> {
                     val pos = cursorPosition.coerceIn(0, currentInputBuffer.length)
                     currentInputBuffer = currentInputBuffer.substring(0, pos)
+                    cursorPosition = pos
                     triggerRender()
                     return true
                 }
@@ -754,7 +910,21 @@ class TerminalSurfaceView @JvmOverloads constructor(
             )
         }
 
-        // 4. Construct StaticLayout with character wrapping & no hyphens
+        // 4. Apply selection highlight span if in selection mode
+        if (isSelectionMode && selectionStart >= 0 && selectionEnd >= 0) {
+            val minPos = minOf(selectionStart, selectionEnd).coerceIn(0, spannableBuilder.length)
+            val maxPos = maxOf(selectionStart, selectionEnd).coerceIn(0, spannableBuilder.length)
+            if (maxPos > minPos) {
+                spannableBuilder.setSpan(
+                    BackgroundColorSpan(Color.parseColor("#80BD93F9")),
+                    minPos,
+                    maxPos,
+                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+        }
+
+        // 5. Construct StaticLayout with character wrapping & no hyphens
         textPaint.textSize = currentTextSize
         val staticLayout: StaticLayout = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val builder = StaticLayout.Builder.obtain(spannableBuilder, 0, spannableBuilder.length, textPaint, layoutWidth)
@@ -780,22 +950,54 @@ class TerminalSurfaceView @JvmOverloads constructor(
             )
         }
 
-        // 5. Calculate vertical scroll offset (supports user drag scroll + auto-scroll)
+        cachedLayout = staticLayout
+        cachedSpannableText = spannableBuilder.toString()
+
+        // 6. Calculate vertical scroll offset (supports user drag scroll + auto-scroll)
         val layoutHeight = staticLayout.height.toFloat()
         val visibleHeight = height.toFloat() - (paddingY * 2)
         val maxScroll = (layoutHeight - visibleHeight).coerceAtLeast(0f)
         maxScrollOffset = maxScroll
 
-        if (!isUserScrolled) {
+        if (!isUserScrolled && !isSelectionMode) {
             currentScrollOffset = maxScroll
         } else {
             currentScrollOffset = currentScrollOffset.coerceIn(0f, maxScroll)
         }
 
-        // 6. Draw the layout to the canvas
+        // 7. Draw the layout to the canvas
         canvas.save()
         canvas.translate(paddingX, paddingY - currentScrollOffset)
         staticLayout.draw(canvas)
         canvas.restore()
+
+        // 8. Draw selection marker pin handles on top of text
+        if (isSelectionMode && selectionStart >= 0 && selectionEnd >= 0) {
+            val minPos = minOf(selectionStart, selectionEnd).coerceIn(0, spannableBuilder.length)
+            val maxPos = maxOf(selectionStart, selectionEnd).coerceIn(0, spannableBuilder.length)
+            if (maxPos > minPos) {
+                val density = resources.displayMetrics.density
+                val startLine = staticLayout.getLineForOffset(minPos)
+                val startX = paddingX + staticLayout.getPrimaryHorizontal(minPos)
+                val startY = paddingY - currentScrollOffset + staticLayout.getLineBottom(startLine)
+
+                val endLine = staticLayout.getLineForOffset(maxPos)
+                val endX = paddingX + staticLayout.getPrimaryHorizontal(maxPos)
+                val endY = paddingY - currentScrollOffset + staticLayout.getLineBottom(endLine)
+
+                startHandleX = startX
+                startHandleY = startY
+                endHandleX = endX
+                endHandleY = endY
+
+                // Draw start pin marker (circle with dark stroke)
+                canvas.drawCircle(startX, startY + (8 * density), 10 * density, handlePaint)
+                canvas.drawCircle(startX, startY + (8 * density), 10 * density, handleStrokePaint)
+
+                // Draw end pin marker (circle with dark stroke)
+                canvas.drawCircle(endX, endY + (8 * density), 10 * density, handlePaint)
+                canvas.drawCircle(endX, endY + (8 * density), 10 * density, handleStrokePaint)
+            }
+        }
     }
 }

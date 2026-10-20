@@ -146,6 +146,81 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
+    <!-- Floating Text Selection Context Toolbar -->
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_selection_bar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="46dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="#F021222C"
+        app:cardCornerRadius="18dp"
+        app:cardElevation="10dp"
+        app:strokeColor="#BD93F9"
+        app:strokeWidth="1.5dp"
+        app:contentPadding="0dp">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp">
+
+            <TextView
+                android:id="@+id/btn_selection_copy"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:text="COPY"
+                android:textColor="#50FA7B"
+                android:textStyle="bold"
+                android:textSize="12sp"
+                android:background="?android:attr/selectableItemBackground"
+                android:clickable="true" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="18dp"
+                android:background="#44475A" />
+
+            <TextView
+                android:id="@+id/btn_selection_select_all"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:text="SELECT ALL"
+                android:textColor="#BD93F9"
+                android:textStyle="bold"
+                android:textSize="12sp"
+                android:background="?android:attr/selectableItemBackground"
+                android:clickable="true" />
+
+            <View
+                android:layout_width="1dp"
+                android:layout_height="18dp"
+                android:background="#44475A" />
+
+            <TextView
+                android:id="@+id/btn_selection_close"
+                android:layout_width="32dp"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:text="✕"
+                android:textColor="#FF5555"
+                android:textStyle="bold"
+                android:textSize="14sp"
+                android:background="?android:attr/selectableItemBackground"
+                android:clickable="true" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
     <!-- Floating Action Controls (Settings & Live Voice Mic) -->
     <LinearLayout
         android:layout_width="wrap_content"

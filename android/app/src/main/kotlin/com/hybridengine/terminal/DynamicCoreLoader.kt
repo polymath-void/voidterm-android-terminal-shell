@@ -71,7 +71,10 @@ object DynamicCoreLoader {
         // 3. Deploy standard POSIX applets (cat, ls, grep, pwd, ping, ip, ifconfig, etc.)
         deployBaseApplets(usrBin)
 
-        // 4. Deploy starter executable scripts in usr/bin
+        // 4. Deploy VoidPkg engine & configuration
+        deployVoidPkg(context, usrBin, usrEtc)
+
+        // 5. Deploy starter executable scripts in usr/bin
         deployScript(
             File(usrBin, "void"),
             """
@@ -111,7 +114,8 @@ object DynamicCoreLoader {
                 echo "Usage: void [status|pkg|reload|storage|version]"
                 ;;
             esac
-            """.trimIndent()
+            """.trimIndent(),
+            overwrite = true
         )
 
         deployScript(
@@ -126,6 +130,8 @@ object DynamicCoreLoader {
             if [ -f "${'$'}PREFIX/bin/voidpkg.py" ] && [ -x "${'$'}PREFIX/bin/python3" ]; then
                 export PREFIX="${'$'}PREFIX"
                 export LD_LIBRARY_PATH="${'$'}PREFIX/lib"
+                export PYTHONHOME="${'$'}PREFIX"
+                export PYTHONPATH="${'$'}PREFIX/lib/python3.14:${'$'}PREFIX/lib/python3.14/lib-dynload"
                 export SSL_CERT_FILE="${'$'}PREFIX/etc/tls/cert.pem"
                 exec "${'$'}PREFIX/bin/python3" "${'$'}PREFIX/bin/voidpkg.py" "${'$'}@"
             fi
@@ -235,7 +241,8 @@ object DynamicCoreLoader {
                 echo "Usage: pkg [install|remove|list|status] [package_name]"
                 ;;
             esac
-            """.trimIndent()
+            """.trimIndent(),
+            overwrite = true
         )
 
         deployScript(
@@ -383,8 +390,48 @@ object DynamicCoreLoader {
         }
     }
 
-    private fun deployScript(file: File, content: String) {
-        if (!file.exists()) {
+    private fun deployVoidPkg(context: Context, usrBin: File, usrEtc: File) {
+        val voidpkgDest = File(usrBin, "voidpkg.py")
+        try {
+            context.assets.open("voidpkg.py").use { input ->
+                FileOutputStream(voidpkgDest).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            voidpkgDest.setExecutable(true, false)
+            voidpkgDest.setReadable(true, false)
+            Log.i(TAG, "Successfully extracted voidpkg.py from assets.")
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice: voidpkg.py extraction from assets: ${e.message}")
+        }
+
+        // Deploy default repos.json
+        val pkgEtc = File(usrEtc, "pkg").apply { mkdirs() }
+        val reposJson = File(pkgEtc, "repos.json")
+        if (!reposJson.exists()) {
+            val defaultRepos = JSONObject().apply {
+                put("default_provider", "termux")
+                val providers = JSONObject().apply {
+                    val termux = JSONObject().apply {
+                        put("name", "Termux Main (AArch64)")
+                        put("url", "https://packages-cf.termux.dev/apt/termux-main/")
+                        put("packages_path", "dists/stable/main/binary-aarch64/Packages.gz")
+                        put("enabled", true)
+                    }
+                    put("termux", termux)
+                }
+                put("providers", providers)
+            }
+            try {
+                FileOutputStream(reposJson).use {
+                    it.write(defaultRepos.toString(2).toByteArray(Charsets.UTF_8))
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    private fun deployScript(file: File, content: String, overwrite: Boolean = false) {
+        if (!file.exists() || overwrite) {
             try {
                 FileOutputStream(file).use {
                     it.write(content.toByteArray(Charsets.UTF_8))

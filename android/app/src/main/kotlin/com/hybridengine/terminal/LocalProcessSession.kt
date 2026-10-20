@@ -178,10 +178,28 @@ class LocalProcessSession(
         val candidates = listOf(
             File(context.filesDir, "usr/bin/bash").absolutePath,
             File(context.filesDir, "usr/bin/sh").absolutePath,
-            "/data/data/com.termux/files/usr/bin/bash",
             "/system/bin/sh"
         )
-        return candidates.firstOrNull { File(it).canExecute() } ?: "/system/bin/sh"
+        for (candidate in candidates) {
+            val file = File(candidate)
+            if (file.canExecute() && testBinaryExecution(candidate)) {
+                return candidate
+            }
+        }
+        return "/system/bin/sh"
+    }
+
+    private fun testBinaryExecution(binaryPath: String): Boolean {
+        if (binaryPath == "/system/bin/sh") return true
+        return try {
+            val usrLib = File(context.filesDir, "usr/lib").absolutePath
+            val pb = ProcessBuilder(binaryPath, "-c", "exit 0")
+            pb.environment()["LD_LIBRARY_PATH"] = usrLib
+            val p = pb.start()
+            p.waitFor() == 0
+        } catch (_: Exception) {
+            false
+        }
     }
 
     companion object {
