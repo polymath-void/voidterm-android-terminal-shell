@@ -4,6 +4,7 @@ import sys
 import json
 import gzip
 import urllib.request
+import ssl
 import io
 import tarfile
 import subprocess
@@ -38,6 +39,23 @@ def ensure_dirs():
     if not os.path.exists(REPOS_FILE):
         with open(REPOS_FILE, "w") as f:
             json.dump(DEFAULT_REPOS, f, indent=2)
+
+def get_ssl_context():
+    cert_candidates = [
+        os.environ.get("SSL_CERT_FILE"),
+        os.path.join(PREFIX, "etc", "tls", "cert.pem"),
+        os.path.join(PREFIX, "etc", "ssl", "cert.pem"),
+    ]
+    for c in cert_candidates:
+        if c and os.path.isfile(c):
+            try:
+                return ssl.create_default_context(cafile=c)
+            except Exception:
+                pass
+    try:
+        return ssl.create_default_context()
+    except Exception:
+        return ssl._create_unverified_context()
 
 def load_repos():
     ensure_dirs()
@@ -77,7 +95,7 @@ def update_catalog():
         print(f"\033[36m[*] Synchronizing index from {repo['name']}...\033[0m")
         try:
             req = urllib.request.Request(pkg_url, headers=headers)
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=15, context=get_ssl_context()) as resp:
                 data = resp.read()
             decompressed = gzip.decompress(data).decode("utf-8", errors="ignore")
             
@@ -187,7 +205,26 @@ def install_single_pkg(pkg_name, catalog, installed):
     if pkg_name in installed:
         return True
     if pkg_name not in catalog:
+        aliases = {
+            "ssh": "openssh",
+            "python": "python",
+            "vim": "vim",
+            "neovim": "neovim",
+            "clang": "clang",
+            "c++": "clang",
+            "gcc": "clang",
+            "node": "nodejs",
+            "npm": "nodejs",
+        }
+        mapped = aliases.get(pkg_name.lower())
+        if mapped and mapped in catalog:
+            print(f"\033[36m[*] Mapping package alias '{pkg_name}' -> '{mapped}'\033[0m")
+            return install_single_pkg(mapped, catalog, installed)
+
         print(f"\033[31m[!] Package '{pkg_name}' not found in registered repositories.\033[0m")
+        matches = [k for k in catalog.keys() if pkg_name.lower() in k.lower()][:4]
+        if matches:
+            print(f"\033[33m    Did you mean: {', '.join(matches)}?\033[0m")
         return False
         
     pkg_data = catalog[pkg_name]
@@ -204,7 +241,7 @@ def install_single_pkg(pkg_name, catalog, installed):
     headers = {"User-Agent": "VoidPkg/1.0 (Android; AArch64)"}
     try:
         req = urllib.request.Request(url, headers=headers)
-        deb_bytes = urllib.request.urlopen(req, timeout=30).read()
+        deb_bytes = urllib.request.urlopen(req, timeout=30, context=get_ssl_context()).read()
     except Exception as e:
         print(f"\033[31m[!] Failed to download {pkg_name}: {e}\033[0m")
         return False

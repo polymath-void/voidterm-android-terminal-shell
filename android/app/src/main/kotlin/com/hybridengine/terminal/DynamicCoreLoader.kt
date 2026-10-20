@@ -405,6 +405,23 @@ object DynamicCoreLoader {
             Log.w(TAG, "Notice: voidpkg.py extraction from assets: ${e.message}")
         }
 
+        // Deploy TLS CA bundle if present in assets
+        val tlsDir = File(usrEtc, "tls").apply { mkdirs() }
+        val certDest = File(tlsDir, "cert.pem")
+        if (!certDest.exists()) {
+            try {
+                context.assets.open("tls/cert.pem").use { input ->
+                    FileOutputStream(certDest).use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                certDest.setReadable(true, false)
+                Log.i(TAG, "Successfully extracted tls/cert.pem from assets.")
+            } catch (e: Exception) {
+                Log.w(TAG, "Notice: tls/cert.pem extraction from assets: ${e.message}")
+            }
+        }
+
         // Deploy default repos.json
         val pkgEtc = File(usrEtc, "pkg").apply { mkdirs() }
         val reposJson = File(pkgEtc, "repos.json")
