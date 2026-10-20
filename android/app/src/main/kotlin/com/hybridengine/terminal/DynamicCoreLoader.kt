@@ -89,9 +89,19 @@ object DynamicCoreLoader {
             File(usrBin, "pkg"),
             """
             #!/system/bin/sh
-            # VoidTerm MiniPkg - Self-Contained Rootless Package Manager
+            # VoidTerm Package Manager (VoidPkg Router)
             SELF_DIR="${'$'}(cd "${'$'}(dirname "${'$'}0")" && pwd)"
             PREFIX="${'$'}(cd "${'$'}SELF_DIR/.." && pwd)"
+
+            # If VoidPkg Python engine is present, route to full universal package manager
+            if [ -f "${'$'}PREFIX/bin/voidpkg.py" ] && [ -x "${'$'}PREFIX/bin/python3" ]; then
+                export PREFIX="${'$'}PREFIX"
+                export LD_LIBRARY_PATH="${'$'}PREFIX/lib"
+                export SSL_CERT_FILE="${'$'}PREFIX/etc/tls/cert.pem"
+                exec "${'$'}PREFIX/bin/python3" "${'$'}PREFIX/bin/voidpkg.py" "${'$'}@"
+            fi
+
+            # Offline Fallback: Local MiniPkg Applet Linker
             BIN_DIR="${'$'}PREFIX/bin"
             LIB_DIR="${'$'}PREFIX/lib"
             ETC_DIR="${'$'}PREFIX/etc"
@@ -155,7 +165,7 @@ object DynamicCoreLoader {
                     ;;
                   *)
                     echo "\033[31m[!] Unknown package: ${'$'}2\033[0m"
-                    echo "Available packages: coreutils, net-tools, proc-tools, dev-tools, all"
+                    echo "Available offline packages: coreutils, net-tools, proc-tools, dev-tools, all"
                     ;;
                 esac
                 ;;
