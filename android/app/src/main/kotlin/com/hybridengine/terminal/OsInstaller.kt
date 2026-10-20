@@ -20,6 +20,8 @@ class OsInstaller(private val context: Context) {
         Log.d("VoidTerm-Installer", "Checking for bundled Debian rootfs archive...")
 
         try {
+            val assetList = context.assets.list("") ?: emptyArray()
+
             // Check if rootfs asset exists (.tar or .tar.gz)
             val tarAsset = assetList.firstOrNull { it.startsWith("debian-rootfs.tar") }
             if (tarAsset != null) {

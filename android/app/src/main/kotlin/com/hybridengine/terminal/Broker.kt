@@ -1,5 +1,6 @@
 package com.hybridengine.terminal
 
+import android.content.Context
 import android.util.Log
 import org.json.JSONObject
 
@@ -11,12 +12,17 @@ data class HudTelemetry(
     val progress: Float? = null
 )
 
-class Broker(var outputListener: ((String) -> Unit)? = null) {
+class Broker(
+    val context: Context? = null,
+    var outputListener: ((String) -> Unit)? = null
+) {
     
     private var isNativeLoaded = false
     var hudTelemetryListener: ((HudTelemetry) -> Unit)? = null
+    var localSession: LocalProcessSession? = null
 
-    constructor(terminalView: TerminalSurfaceView) : this({ terminalView.appendOutput(it) })
+    constructor(outputListener: ((String) -> Unit)?) : this(null, outputListener)
+    constructor(terminalView: TerminalSurfaceView) : this(terminalView.context, { terminalView.appendOutput(it) })
 
     init {
         try {
@@ -31,7 +37,9 @@ class Broker(var outputListener: ((String) -> Unit)? = null) {
     }
 
     fun start() {
-        if (isNativeLoaded) {
+        if (localSession != null) {
+            localSession?.start()
+        } else if (isNativeLoaded) {
             try {
                 startDaemon()
                 emitOutput("🚀 VoidTerm Shell Terminal v0.1.0-alpha")
@@ -48,7 +56,30 @@ class Broker(var outputListener: ((String) -> Unit)? = null) {
     }
 
     fun send(command: String) {
-        if (isNativeLoaded) {
+        val trimmed = command.trim()
+        if (trimmed == "reload" || trimmed == "void reload") {
+            context?.let { ctx ->
+                DynamicCoreLoader.reload(ctx)
+                emitOutput("\r\n\u001b[32m✔ [VoidTerm] Core dynamic scripts and config reloaded.\u001b[0m\r\n")
+                return
+            }
+        }
+        if (trimmed == "restart") {
+            localSession?.restart()
+            emitOutput("\r\n\u001b[33m⚡ [VoidTerm] Shell process restarted.\u001b[0m\r\n")
+            return
+        }
+        if (trimmed == "help" || trimmed == "void help") {
+            emitOutput("\r\n\u001b[36m--- VoidTerm Builtin Directives ---\u001b[0m\r\n")
+            emitOutput("  reload     : Hot-reload /files/usr/bin/* and voidterm.json\r\n")
+            emitOutput("  restart    : Restart the active shell session\r\n")
+            emitOutput("  void status: Inspect runtime kernel, architecture & environment\r\n")
+            emitOutput("  void pkg   : Package manager interface\r\n\r\n")
+        }
+
+        if (localSession != null) {
+            localSession?.write(command)
+        } else if (isNativeLoaded) {
             try {
                 sendCommand(command)
             } catch (e: Throwable) {
@@ -98,7 +129,7 @@ class Broker(var outputListener: ((String) -> Unit)? = null) {
         emitOutput(output)
     }
 
-    private fun emitOutput(text: String) {
+    fun emitOutput(text: String) {
         outputListener?.invoke(text)
     }
 }

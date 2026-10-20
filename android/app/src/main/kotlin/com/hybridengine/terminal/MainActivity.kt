@@ -174,7 +174,17 @@ class MainActivity : AppCompatActivity() {
         terminalSurface.onCommandSubmitted = { command ->
             val trimmed = command.trim()
             if (trimmed.isNotEmpty()) {
+                terminalSurface.appendOutput("\u001b[32m$ $trimmed\u001b[0m\r\n")
                 terminalService?.broker?.send(trimmed)
+            }
+        }
+
+        // 5. Connect Dynamic Config and Resource Reloader to Terminal UI
+        DynamicCoreLoader.onConfigReloaded = {
+            runOnUiThread {
+                if (::terminalSurface.isInitialized) {
+                    terminalSurface.reloadConfig()
+                }
             }
         }
     }

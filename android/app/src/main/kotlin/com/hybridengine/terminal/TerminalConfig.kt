@@ -93,14 +93,18 @@ enum class CursorStyle(val symbol: String) {
 }
 
 /**
- * Configuration manager backed by PreferenceManager.getDefaultSharedPreferences.
+ * Configuration manager backed by PreferenceManager.getDefaultSharedPreferences and voidterm.json.
  */
-class TerminalConfig(context: Context) {
+class TerminalConfig(private val context: Context) {
 
     private val prefs: SharedPreferences = PreferenceManager.getDefaultSharedPreferences(context)
 
     var theme: TerminalTheme
         get() {
+            val json = DynamicCoreLoader.loadConfig(context)
+            if (json.has(KEY_THEME)) {
+                return TerminalTheme.fromString(json.getString(KEY_THEME))
+            }
             val raw = prefs.getString(KEY_THEME, null)
                 ?: prefs.getString(LEGACY_KEY_THEME, TerminalTheme.DRACULA.name)
                 ?: TerminalTheme.DRACULA.name
@@ -112,6 +116,10 @@ class TerminalConfig(context: Context) {
 
     var fontSize: Float
         get() {
+            val json = DynamicCoreLoader.loadConfig(context)
+            if (json.has(KEY_FONT_SIZE)) {
+                return json.optDouble(KEY_FONT_SIZE, DEFAULT_FONT_SIZE.toDouble()).toFloat().coerceIn(20f, 100f)
+            }
             val fromString = try {
                 prefs.getString(KEY_FONT_SIZE, null)?.toFloatOrNull()
             } catch (_: Exception) {
@@ -134,6 +142,10 @@ class TerminalConfig(context: Context) {
 
     var cursorStyle: CursorStyle
         get() {
+            val json = DynamicCoreLoader.loadConfig(context)
+            if (json.has(KEY_CURSOR_STYLE)) {
+                return CursorStyle.fromString(json.getString(KEY_CURSOR_STYLE))
+            }
             val raw = prefs.getString(KEY_CURSOR_STYLE, null)
                 ?: prefs.getString(LEGACY_KEY_CURSOR_STYLE, CursorStyle.BLOCK.name)
                 ?: CursorStyle.BLOCK.name
@@ -145,6 +157,10 @@ class TerminalConfig(context: Context) {
 
     var cursorBlink: Boolean
         get() {
+            val json = DynamicCoreLoader.loadConfig(context)
+            if (json.has(KEY_CURSOR_BLINK)) {
+                return json.optBoolean(KEY_CURSOR_BLINK, true)
+            }
             return if (prefs.contains(KEY_CURSOR_BLINK)) {
                 prefs.getBoolean(KEY_CURSOR_BLINK, true)
             } else {
