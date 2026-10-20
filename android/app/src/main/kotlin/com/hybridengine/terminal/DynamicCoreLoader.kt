@@ -3,8 +3,10 @@ package com.hybridengine.terminal
 import android.content.Context
 import android.util.Log
 import org.json.JSONObject
+import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.util.zip.ZipInputStream
 
 /**
  * DynamicCoreLoader: Manages the instant-editable POSIX filesystem hierarchy,
@@ -22,6 +24,9 @@ object DynamicCoreLoader {
         val usrLib = File(filesDir, "usr/lib").apply { mkdirs() }
         val usrTmp = File(filesDir, "usr/tmp").apply { mkdirs() }
         val homeDir = File(filesDir, "home").apply { mkdirs() }
+
+        // 0. Extract self-contained bootstrap rootfs (bash, python, patchelf, core libs) if present in assets
+        unpackBootstrapIfNeeded(context, File(filesDir, "usr"))
 
         // Ensure core Bionic system libraries are symlinked if missing (libz.so.1, libz.so)
         val libz1 = File(usrLib, "libz.so.1")
@@ -481,6 +486,60 @@ object DynamicCoreLoader {
             } catch (e: Exception) {
                 Log.e(TAG, "Error deploying script ${file.name}: ${e.message}")
             }
+        }
+    }
+
+    private fun unpackBootstrapIfNeeded(context: Context, usrDir: File) {
+        val stampFile = File(usrDir, ".bootstrapped")
+        if (stampFile.exists()) return
+
+        val assetName = "bootstrap-aarch64.zip"
+        val hasAsset = try {
+            context.assets.open(assetName).close()
+            true
+        } catch (_: Exception) {
+            false
+        }
+        if (!hasAsset) return
+
+        try {
+            Log.i(TAG, "Unpacking $assetName into ${usrDir.absolutePath}...")
+            context.assets.open(assetName).use { rawIn ->
+                ZipInputStream(BufferedInputStream(rawIn)).use { zis ->
+                    var entry = zis.nextEntry
+                    val buffer = ByteArray(8192)
+                    while (entry != null) {
+                        val outFile = File(usrDir, entry.name)
+                        // Security check: Zip Slip path traversal guard
+                        if (!outFile.canonicalPath.startsWith(usrDir.canonicalPath)) {
+                            entry = zis.nextEntry
+                            continue
+                        }
+
+                        if (entry.isDirectory) {
+                            outFile.mkdirs()
+                        } else {
+                            outFile.parentFile?.mkdirs()
+                            FileOutputStream(outFile).use { fos ->
+                                var len: Int
+                                while (zis.read(buffer).also { len = it } > 0) {
+                                    fos.write(buffer, 0, len)
+                                }
+                            }
+                            if (entry.name.startsWith("bin/") || entry.name.contains(".so")) {
+                                outFile.setExecutable(true, false)
+                            }
+                            outFile.setReadable(true, false)
+                        }
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                    }
+                }
+            }
+            stampFile.writeText("1.0.0")
+            Log.i(TAG, "Successfully extracted bootstrap container rootfs.")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unpacking bootstrap container: ${e.message}", e)
         }
     }
 
