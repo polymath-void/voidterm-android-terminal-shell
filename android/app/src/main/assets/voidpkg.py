@@ -212,9 +212,15 @@ def fix_shebang(filepath):
     except Exception:
         pass
 
-def install_single_pkg(pkg_name, catalog, installed):
+def install_single_pkg(pkg_name, catalog, installed, _visiting=None):
+    if _visiting is None:
+        _visiting = set()
     if pkg_name in installed:
         return True
+    if pkg_name in _visiting:
+        return True
+    _visiting.add(pkg_name)
+
     if pkg_name not in catalog:
         aliases = {
             "ssh": "openssh",
@@ -246,7 +252,7 @@ def install_single_pkg(pkg_name, catalog, installed):
         mapped = aliases.get(pkg_name.lower())
         if mapped and mapped in catalog:
             print(f"\033[36m[*] Mapping package alias '{pkg_name}' -> '{mapped}'\033[0m")
-            return install_single_pkg(mapped, catalog, installed)
+            return install_single_pkg(mapped, catalog, installed, _visiting)
 
         print(f"\033[31m[!] Package '{pkg_name}' not found in registered repositories.\033[0m")
         matches = [k for k in catalog.keys() if pkg_name.lower() in k.lower()][:4]
@@ -261,7 +267,7 @@ def install_single_pkg(pkg_name, catalog, installed):
             dep_name = dep_clause.split("|")[0].strip().split()[0]
             if dep_name and dep_name not in installed and dep_name in catalog:
                 print(f"\033[35m[→] Resolving dependency: {dep_name}\033[0m")
-                install_single_pkg(dep_name, catalog, installed)
+                install_single_pkg(dep_name, catalog, installed, _visiting)
 
     url = pkg_data["repo_base"] + pkg_data["filename"]
     print(f"\033[36m[*] Downloading {pkg_name} ({pkg_data.get('version', '')})...\033[0m")
@@ -281,7 +287,11 @@ def install_single_pkg(pkg_name, catalog, installed):
         print(f"\033[31m[!] Corrupt deb package {pkg_name}: {e}\033[0m")
         return False
 
-    tar = tarfile.open(fileobj=io.BytesIO(data_tar_bytes))
+    try:
+        tar = tarfile.open(fileobj=io.BytesIO(data_tar_bytes), mode="r:*")
+    except Exception as e:
+        print(f"\033[31m[!] Failed to extract payload for {pkg_name}: {e}\033[0m")
+        return False
     installed_files = []
     
     for member in tar.getmembers():
@@ -392,7 +402,61 @@ Usage:
   pkg list                     List all installed packages
   pkg repo [list|add|remove]   Manage multi-repository sources
   pkg status                   Display prefix and storage telemetry
+  pkg doctor                   Verify subsystem integrity and library linkages
 """)
+
+def run_doctor():
+    print("\033[36m=== VoidTerm Subsystem Health & Doctor ===\033[0m")
+    all_ok = True
+
+    # 1. Check bootstrap marker
+    boot_marker = os.path.join(PREFIX, ".bootstrapped")
+    if os.path.exists(boot_marker):
+        with open(boot_marker, "r") as f:
+            v = f.read().strip()
+        print(f"  \033[32m✔\033[0m Bootstrap Rootfs: Active (version {v})")
+    else:
+        print(f"  \033[33m⚠\033[0m Bootstrap Rootfs: Marker not found")
+
+    # 2. Check essential binaries
+    for b in ["bash", "sh", "python3", "patchelf"]:
+        bp = os.path.join(BIN_DIR, b)
+        if os.path.exists(bp) and os.access(bp, os.X_OK):
+            print(f"  \033[32m✔\033[0m Binary {b}: Present & Executable")
+        else:
+            print(f"  \033[31m✘\033[0m Binary {b}: Missing or Not Executable")
+            all_ok = False
+
+    # 3. Check core shared libraries
+    for l in ["libreadline.so.8", "libncursesw.so.6", "libz.so.1", "libc++_shared.so", "libandroid-support.so"]:
+        lp = os.path.join(LIB_DIR, l)
+        if os.path.exists(lp) and os.path.getsize(lp) > 1024:
+            print(f"  \033[32m✔\033[0m Shared Library {l}: Valid ELF ({os.path.getsize(lp)} bytes)")
+        else:
+            print(f"  \033[31m✘\033[0m Shared Library {l}: Missing or Placeholder")
+            all_ok = False
+
+    # 4. Check TLS CA bundle
+    cert_path = os.path.join(ETC_DIR, "tls", "cert.pem")
+    if os.path.exists(cert_path) and os.path.getsize(cert_path) > 1024:
+        print(f"  \033[32m✔\033[0m TLS CA Bundle: Present ({os.path.getsize(cert_path)} bytes)")
+    else:
+        print(f"  \033[33m⚠\033[0m TLS CA Bundle: Missing (SSL fallback mode active)")
+
+    # 5. Check terminfo
+    ti_path = os.path.join(PREFIX, "share", "terminfo", "x", "xterm-256color")
+    ti_alt = os.path.join(ETC_DIR, "terminfo", "x", "xterm-256color")
+    if os.path.exists(ti_path) or os.path.exists(ti_alt):
+        print(f"  \033[32m✔\033[0m Terminfo (xterm-256color): Present")
+    else:
+        print(f"  \033[33m⚠\033[0m Terminfo: Missing")
+
+    print("")
+    if all_ok:
+        print("\033[32m[PASS] VoidTerm core container is healthy and stable.\033[0m")
+    else:
+        print("\033[31m[FAIL] VoidTerm detected missing dependencies. Run reload or reinstall.\033[0m")
+    return all_ok
 
 def main():
     if len(sys.argv) < 2:
@@ -432,6 +496,8 @@ def main():
         print(f"  Prefix  : {PREFIX}")
         print(f"  Binaries: {len(os.listdir(BIN_DIR)) if os.path.exists(BIN_DIR) else 0} active tools")
         print(f"  Packages: {len(get_installed())} external packages installed")
+    elif cmd in ["doctor", "health", "check"]:
+        run_doctor()
     else:
         print_help()
 

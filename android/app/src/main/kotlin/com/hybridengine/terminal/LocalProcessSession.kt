@@ -50,6 +50,8 @@ class LocalProcessSession(
         env["SHELL"] = shellBinary
         env["LD_LIBRARY_PATH"] = "$usrPath/lib"
         env["PATH"] = "$usrPath/bin:/system/bin:/system/xbin"
+        env["TERMINFO"] = "$usrPath/share/terminfo"
+        env["TERMINFO_DIRS"] = "$usrPath/share/terminfo:$usrPath/etc/terminfo"
         env["VOIDTERM_VERSION"] = "1.0.0-alpha"
 
         // Ensure executable permissions on all usr/bin scripts
@@ -193,11 +195,16 @@ class LocalProcessSession(
         if (binaryPath == "/system/bin/sh") return true
         return try {
             val usrLib = File(context.filesDir, "usr/lib").absolutePath
+            val usrBin = File(context.filesDir, "usr/bin").absolutePath
             val pb = ProcessBuilder(binaryPath, "-c", "exit 0")
             pb.environment()["LD_LIBRARY_PATH"] = usrLib
+            pb.environment()["PATH"] = "$usrBin:/system/bin:/system/xbin"
             val p = pb.start()
-            p.waitFor() == 0
-        } catch (_: Exception) {
+            val code = p.waitFor()
+            Log.i(TAG, "testBinaryExecution for $binaryPath result: $code")
+            code == 0
+        } catch (e: Exception) {
+            Log.w(TAG, "testBinaryExecution for $binaryPath failed: ${e.message}")
             false
         }
     }

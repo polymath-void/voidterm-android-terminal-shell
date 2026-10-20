@@ -155,12 +155,18 @@ class MainActivity : AppCompatActivity() {
 
         btnSelectionCopy?.setOnClickListener {
             it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-            val text = terminalSurface.getSelectedText()
-            if (!text.isNullOrEmpty()) {
+            val selected = terminalSurface.getSelectedText()
+            val textToCopy = if (!selected.isNullOrEmpty()) {
+                selected
+            } else {
+                terminalSurface.copyAllText()
+            }
+            if (!textToCopy.isNullOrEmpty()) {
                 val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                val clip = ClipData.newPlainText("VoidTerm", text)
+                val clip = ClipData.newPlainText("VoidTerm", textToCopy)
                 clipboard.setPrimaryClip(clip)
-                Toast.makeText(this@MainActivity, "Selection copied", Toast.LENGTH_SHORT).show()
+                val msg = if (!selected.isNullOrEmpty()) "Selection copied" else "Terminal output copied"
+                Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
             }
             terminalSurface.clearSelection()
             cardSelectionBar?.visibility = View.GONE

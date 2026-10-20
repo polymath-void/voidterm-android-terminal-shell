@@ -15,6 +15,7 @@ import java.util.zip.ZipInputStream
 object DynamicCoreLoader {
 
     private const val TAG = "DynamicCoreLoader"
+    private const val CURRENT_BOOTSTRAP_VERSION = "1.0.4"
     var onConfigReloaded: (() -> Unit)? = null
 
     fun initialize(context: Context) {
@@ -28,28 +29,8 @@ object DynamicCoreLoader {
         // 0. Extract self-contained bootstrap rootfs (bash, python, patchelf, core libs) if present in assets
         unpackBootstrapIfNeeded(context, File(filesDir, "usr"))
 
-        // Ensure core Bionic system libraries are symlinked if missing (libz.so.1, libz.so)
-        val libz1 = File(usrLib, "libz.so.1")
-        if (!libz1.exists()) {
-            val sysLibz = File("/system/lib64/libz.so")
-            if (sysLibz.exists()) {
-                try {
-                    android.system.Os.symlink(sysLibz.absolutePath, libz1.absolutePath)
-                    Log.i(TAG, "Linked system libz.so to ${libz1.absolutePath}")
-                } catch (e: Exception) {
-                    Log.w(TAG, "Notice linking libz.so.1: ${e.message}")
-                }
-            }
-        }
-        val libz = File(usrLib, "libz.so")
-        if (!libz.exists()) {
-            val sysLibz = File("/system/lib64/libz.so")
-            if (sysLibz.exists()) {
-                try {
-                    android.system.Os.symlink(sysLibz.absolutePath, libz.absolutePath)
-                } catch (_: Exception) {}
-            }
-        }
+        // Run self-repair scanner on shared libraries and binaries
+        repairAndVerifySharedLibraries(usrLib)
 
         // 1. Create or load runtime configuration
         val configFile = File(usrEtc, "voidterm.json")
@@ -491,7 +472,10 @@ object DynamicCoreLoader {
 
     private fun unpackBootstrapIfNeeded(context: Context, usrDir: File) {
         val stampFile = File(usrDir, ".bootstrapped")
-        if (stampFile.exists()) return
+        if (stampFile.exists() && stampFile.readText().trim() == CURRENT_BOOTSTRAP_VERSION) {
+            repairAndVerifySharedLibraries(File(usrDir, "lib"))
+            return
+        }
 
         val assetName = "bootstrap-aarch64.zip"
         val hasAsset = try {
@@ -536,10 +520,75 @@ object DynamicCoreLoader {
                     }
                 }
             }
-            stampFile.writeText("1.0.0")
-            Log.i(TAG, "Successfully extracted bootstrap container rootfs.")
+            repairAndVerifySharedLibraries(File(usrDir, "lib"))
+            stampFile.writeText(CURRENT_BOOTSTRAP_VERSION)
+            Log.i(TAG, "Successfully extracted bootstrap container rootfs v$CURRENT_BOOTSTRAP_VERSION.")
         } catch (e: Exception) {
             Log.e(TAG, "Error unpacking bootstrap container: ${e.message}", e)
+        }
+    }
+
+    private fun repairAndVerifySharedLibraries(usrLib: File) {
+        if (!usrLib.exists() || !usrLib.isDirectory) return
+        try {
+            val files = usrLib.listFiles() ?: return
+            for (file in files) {
+                if (file.isFile && (file.name.endsWith(".so") || file.name.contains(".so."))) {
+                    // Detect placeholder files (e.g. symlink strings extracted by ZipInputStream)
+                    if (file.length() in 1..255) {
+                        try {
+                            val targetName = file.readText().trim()
+                            val targetFile = File(usrLib, targetName)
+                            if (targetFile.exists() && targetFile.length() > 1024) {
+                                file.delete()
+                                try {
+                                    android.system.Os.symlink(targetName, file.absolutePath)
+                                } catch (_: Exception) {
+                                    java.nio.file.Files.copy(
+                                        targetFile.toPath(),
+                                        file.toPath(),
+                                        java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                                    )
+                                }
+                                Log.i(TAG, "Repaired library placeholder: ${file.name} -> $targetName")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Error repairing library ${file.name}: ${e.message}")
+                        }
+                    }
+                }
+            }
+
+            // Guarantee libz.so.1 presence
+            val libz1 = File(usrLib, "libz.so.1")
+            if (!libz1.exists() || libz1.length() < 1024) {
+                val localLibz = File(usrLib, "libz.so.1.3.2")
+                val sysLibz = File("/system/lib64/libz.so")
+                try {
+                    if (libz1.exists()) libz1.delete()
+                    if (localLibz.exists()) {
+                        java.nio.file.Files.copy(localLibz.toPath(), libz1.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                    } else if (sysLibz.exists()) {
+                        android.system.Os.symlink(sysLibz.absolutePath, libz1.absolutePath)
+                    }
+                } catch (_: Exception) {}
+            }
+
+            val libz = File(usrLib, "libz.so")
+            if (!libz.exists() || libz.length() < 1024) {
+                val localLibz = File(usrLib, "libz.so.1.3.2")
+                val sysLibz = File("/system/lib64/libz.so")
+                try {
+                    if (libz.exists()) libz.delete()
+                    if (localLibz.exists()) {
+                        java.nio.file.Files.copy(localLibz.toPath(), libz.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                    } else if (sysLibz.exists()) {
+                        android.system.Os.symlink(sysLibz.absolutePath, libz.absolutePath)
+                    }
+                } catch (_: Exception) {}
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Library verification notice: ${e.message}")
         }
     }
 

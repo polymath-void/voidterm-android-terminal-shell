@@ -263,7 +263,9 @@ class TerminalSurfaceView @JvmOverloads constructor(
         val text = cachedSpannableText
         val minPos = minOf(selectionStart, selectionEnd).coerceIn(0, text.length)
         val maxPos = maxOf(selectionStart, selectionEnd).coerceIn(0, text.length)
-        return if (maxPos > minPos) text.substring(minPos, maxPos) else null
+        if (maxPos <= minPos) return null
+        val raw = text.substring(minPos, maxPos)
+        return raw.replace("\u258c", "").replace("\u2588", "").replace("\u0000", "")
     }
 
     fun selectAllText() {
@@ -315,23 +317,20 @@ class TerminalSurfaceView @JvmOverloads constructor(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        scaleGestureDetector.onTouchEvent(event)
-        gestureDetector.onTouchEvent(event)
-
         if (scaleGestureDetector.isInProgress || event.pointerCount > 1) {
             isDragging = false
             return true
         }
 
         val density = resources.displayMetrics.density
-        val handleHitRadius = 32 * density
+        val handleHitRadius = 38 * density
 
-        // Handle draggable marker handles in selection mode
+        // 1. Handle draggable marker handles in selection mode with priority
         if (isSelectionMode) {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    val distStart = hypot(event.x - startHandleX, event.y - (startHandleY + 10 * density))
-                    val distEnd = hypot(event.x - endHandleX, event.y - (endHandleY + 10 * density))
+                    val distStart = hypot(event.x - startHandleX, event.y - (startHandleY + 8 * density))
+                    val distEnd = hypot(event.x - endHandleX, event.y - (endHandleY + 8 * density))
                     if (distStart < handleHitRadius) {
                         activeHandle = Handle.START
                         parent?.requestDisallowInterceptTouchEvent(true)
@@ -369,6 +368,10 @@ class TerminalSurfaceView @JvmOverloads constructor(
                 }
             }
         }
+
+        // 2. Delegate to gestures only if not actively dragging marker handles
+        scaleGestureDetector.onTouchEvent(event)
+        gestureDetector.onTouchEvent(event)
 
         // Standard scrolling & soft-keyboard invocation
         when (event.actionMasked) {
