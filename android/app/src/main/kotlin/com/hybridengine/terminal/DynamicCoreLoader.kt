@@ -245,6 +245,7 @@ object DynamicCoreLoader {
                 export PREFIX="/data/user/0/com.hybridengine.terminal/files/usr"
                 export HOME="/data/user/0/com.hybridengine.terminal/files/home"
                 export TMPDIR="${'$'}PREFIX/tmp"
+                export LD_LIBRARY_PATH="${'$'}PREFIX/lib"
                 export PATH="${'$'}PREFIX/bin:/system/bin:/system/xbin"
                 export TERM="xterm-256color"
                 export PS1="voidterm:\w$ "

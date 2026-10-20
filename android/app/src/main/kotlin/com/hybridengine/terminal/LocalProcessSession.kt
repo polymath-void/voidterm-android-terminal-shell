@@ -44,6 +44,7 @@ class LocalProcessSession(
         env["ENV"] = "$homePath/.bashrc"
         env["TERM"] = "xterm-256color"
         env["SHELL"] = shellBinary
+        env["LD_LIBRARY_PATH"] = "$usrPath/lib"
         env["PATH"] = "$usrPath/bin:/data/data/com.termux/files/usr/bin:/system/bin:/system/xbin"
         env["VOIDTERM_VERSION"] = "1.0.0-alpha"
 
