@@ -144,18 +144,14 @@ class LocalProcessSession(
 
     fun getProcessPid(proc: Process): Int? {
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                proc.pid().toInt()
-            } else {
-                val field = proc.javaClass.getDeclaredField("pid")
-                field.isAccessible = true
-                field.getInt(proc)
-            }
+            val field = proc.javaClass.getDeclaredField("pid")
+            field.isAccessible = true
+            field.getInt(proc)
         } catch (_: Exception) {
             try {
-                val field = proc.javaClass.getDeclaredField("pid")
-                field.isAccessible = true
-                field.getInt(proc)
+                val method = proc.javaClass.getMethod("pid")
+                val res = method.invoke(proc)
+                (res as? Number)?.toInt()
             } catch (_: Exception) {
                 null
             }
