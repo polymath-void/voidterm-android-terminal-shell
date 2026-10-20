@@ -21,10 +21,12 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import android.view.ViewConfiguration
 import android.view.inputmethod.BaseInputConnection
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
+import kotlin.math.abs
 
 class TerminalSurfaceView @JvmOverloads constructor(
     context: Context,
@@ -131,7 +133,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_MOVE -> {
                 val deltaY = event.y - lastTouchY
-                if (!isDragging && Math.abs(deltaY) > touchSlop) {
+                if (!isDragging && abs(deltaY) > touchSlop) {
                     isDragging = true
                     parent?.requestDisallowInterceptTouchEvent(true)
                 }
