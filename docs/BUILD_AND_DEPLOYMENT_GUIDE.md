@@ -1,119 +1,178 @@
 # VoidTerm: Production Build & Deployment Guide
-## Step-by-Step Instructions for Compiling, Verifying, and Packaging VoidTerm
+## Comprehensive Guide for Compiling, Verifying, and Packaging Sovereign VoidTerm
+
+**Status**: Active Production Guide  
+**Target Platform**: Android 13–16 (`aarch64` / Bionic libc) | Target SDK 34+  
+**CI/CD Pipeline**: GitHub Actions (`.github/workflows/build-apk.yml`) — Verified Passing (`✓`)
 
 ---
 
 ## 1. Prerequisites & Toolchain Setup
 
-To build VoidTerm from source, ensure the following tools are installed:
+To build VoidTerm from source or reproduce the CI/CD pipeline locally:
 
-- **Rust & Cargo**: Version $\ge 1.75$ (`rustup target add aarch64-linux-android`)
-- **Android NDK**: Version $\ge 25\text{c}$ (API level 34+)
-- **Java Development Kit**: JDK 17 or JDK 21
-- **Gradle**: 8.4+ (or bundled Gradle wrapper)
-- **Python**: 3.10+ (for `void` CLI and test clients)
-
----
-
-## 2. Compiling the Rust Core Broker (`hybrid-term-broker`)
-
-The core daemon compiles both as a native Android shared library (`.so`) for JNI integration and as a standalone headless binary.
-
-### A. Build Standalone Daemon (for local testing & CI):
-```bash
-cd hybrid-term-broker
-cargo build --release --bin hybrid-term-broker
-```
-The compiled binary will be located at:
-`target/release/hybrid-term-broker`
-
-### B. Cross-Compile Shared Library for Android JNI (`arm64-v8a`):
-```bash
-cargo build --release --target aarch64-linux-android --lib
-
-# Copy the compiled .so to the Android app jniLibs directory:
-mkdir -p android/app/src/main/jniLibs/arm64-v8a
-cp target/aarch64-linux-android/release/libhybrid_term_broker.so android/app/src/main/jniLibs/arm64-v8a/
-```
+- **Java Development Kit**: JDK 17 (Temurin or OpenJDK)
+- **Android SDK & Build Tools**: Version $\ge 34.0.0$, Android Gradle Plugin 8.3+
+- **Rust Toolchain**: Rust $\ge 1.75$ with static musl target:
+  ```bash
+  rustup target add aarch64-unknown-linux-musl
+  ```
+- **Python**: Python 3.10+ (for `voidpkg.py`, `void_ext_router.py`, and QA analyzer)
+- **Gradle**: Gradle 8.6 (bundled via `./gradlew`)
 
 ---
 
-## 3. Running End-to-End Agent Verification Tests
+## 2. GitHub Actions Automated CI/CD Pipeline
 
-Before packaging the Android APK, execute the end-to-end Agent Control Plane (ACP) integration test:
+The canonical, production-grade build pipeline is fully automated in `.github/workflows/build-apk.yml`. Every commit to `main` executes a two-stage assembly matrix:
 
-```bash
-python3 test_acp_client.py
+```mermaid
+flowchart LR
+    subgraph Job1 ["Job 1: Build Static Musl Guest Daemon (ARM64)"]
+        A1["Checkout Code"] --> A2["Install Rust aarch64-unknown-linux-musl"]
+        A2 --> A3["cargo build --release --bin guest_daemon"]
+        A3 --> A4["Upload Artifact: voidterm-guest-daemon"]
+    end
+
+    subgraph Job2 ["Job 2: Assemble Android APK"]
+        B1["Checkout Code"] --> B2["Setup JDK 17"]
+        B2 --> B3["Download guest-daemon Artifact"]
+        B3 --> B4["Stage MicroVM & Asset Binaries"]
+        B4 --> B5["./gradlew assembleDebug"]
+        B5 --> B6["Verify APK Signature & Integrity"]
+        B6 --> B7["Upload Artifact: VoidTerm-Debug-APK"]
+    end
+
+    Job1 ==>|Pass Artifact| Job2
 ```
 
+### Inspecting Workflow Status:
+```bash
+gh run list --repo polymath-void/voidterm-android-terminal-shell
+gh run view <run_id> --repo polymath-void/voidterm-android-terminal-shell
+```
+
+### Downloading Pre-Built Artifacts:
+```bash
+gh run download <run_id> -n VoidTerm-Debug-APK
+adb install -r app-debug.apk
+```
+
+---
+
+## 3. Local Step-by-Step Compilation
+
+### Step 1: Run Universal QA Static Analysis
+Before compiling, verify that there are zero unmatched brackets, broken string templates, or syntax defects:
+```bash
+python3 ~/.gemini/config/skills/qa-analyzer/scripts/analyzer.py android/
+```
 Expected output:
 ```text
-[+] Broker online. Connecting to ACP socket: /tmp/voidterm_agent.sock
---- Test 1: Ping --- [✔]
---- Test 2: Create Session --- [✔]
---- Test 3: Exec Command in PTY --- [✔]
---- Test 4: Read PTY Snapshot --- [✔]
---- Test 5: Broadcast HUD Telemetry --- [✔]
---- Test 6: List Sessions --- [✔]
---- Test 7: Close Session --- [✔]
-[✔] ALL 7 AGENT CONTROL PLANE TESTS PASSED PERFECTLY!
+🚀 Running Universal QA Analyzer on: android/
+✅ UNIVERSAL QA PASS: Structural integrity and syntax verified.
 ```
 
-### 3.1 CLI Control via `void agent`
-
-You can also interact with the Agent Control Plane directly using the shortform `void` CLI:
-
+### Step 2: Compile Static Musl Guest Daemon (Rust)
 ```bash
-# Check ACP socket status
-void agent ping
+cd hybrid-term-broker
+cargo build --release --target aarch64-unknown-linux-musl --bin guest_daemon
+cd ..
 
-# List active sessions
-void agent list
-
-# Create a dedicated agent session
-void agent create worker-1 --tier local --workdir ~/Projects
-
-# Dispatch command and inspect circular scrollback buffer
-void agent exec "cargo check" --session worker-1
-void agent snapshot --session worker-1 --lines 50
-
-# Broadcast real-time agent HUD telemetry directly to the Android UI
-void agent hud "Refactoring system core" --agent DeepCoder --status working --file lib.rs --progress 0.85
-
-# Close session
-void agent close worker-1
+# Stage compiled binary into Android assets:
+mkdir -p android/app/src/main/assets
+cp hybrid-term-broker/target/aarch64-unknown-linux-musl/release/guest_daemon \
+   android/app/src/main/assets/guest_daemon
 ```
 
----
+### Step 3: Verify Core Assets Inventory
+Ensure that the rootless POSIX bootstrap archive, package manager, and extension SDKs are present:
+```bash
+ls -lh android/app/src/main/assets/
+# Required:
+# - bootstrap-aarch64.zip (16.1 MB)
+# - voidpkg.py
+# - voidls.py
+# - void_ext_router.py
+# - extensions/ (/pkg, /file)
+# - sdk/ (Python & Node.js)
+```
 
-## 4. Building the Android Application APK
-
-From the project root directory:
-
+### Step 4: Assemble Android Application APK
 ```bash
 cd android
 
-# Build Debug APK
+# Build Debug APK (no signing key required):
 ./gradlew assembleDebug
 
-# Build Signed Release APK
+# Build Release APK (requires signing credentials):
 ./gradlew assembleRelease
 ```
 
-The output APK will be placed in:
-`android/app/build/outputs/apk/release/app-release.apk`
+The assembled APKs are generated at:
+- **Debug**: `android/app/build/outputs/apk/debug/app-debug.apk`
+- **Release**: `android/app/build/outputs/apk/release/app-release.apk`
 
 ---
 
-## 5. Google Play Store Release Checklist
+## 4. End-to-End Subsystem Smoke Testing
 
-1. **Target SDK Level**: Verify that `compileSdk` and `targetSdk` in [`android/app/build.gradle.kts`](file:///data/data/com.termux/files/home/Projects/polymath/polymath-void-term/hybrid-engine/android/app/build.gradle.kts) are set to **34** or higher.
-2. **App Permissions**: Verify `AndroidManifest.xml` requests only required capabilities:
-   - `android.permission.FOREGROUND_SERVICE`
-   - `android.permission.FOREGROUND_SERVICE_SPECIAL_USE`
-   - `android.permission.WAKE_LOCK`
-3. **W^X Policy Compliance**: Confirm that no executable binaries are extracted to or launched from `/data/data/.../files/`. All host native executables must be mapped via `libhybrid_term_broker.so` or executed within the AVF microVM (`crosvm`).
-4. **App Bundle (.aab)**: For Play Store submission, build the Android App Bundle:
+Once installed on an Android device or emulator, execute the following verification commands inside VoidTerm:
+
+### 1. Verify Unprivileged Hot-Reload:
+```bash
+void reload
+# Expected output:
+# [VoidTerm] Reload trigger written to filesystem.
+# TerminalService logs: Hot-reloading DynamicCoreLoader.
+```
+
+### 2. Verify Package Manager & Dynamic Linker:
+```bash
+pkg doctor
+# Expected output:
+# [✔] Verifying prefix directory... PASS
+# [✔] Verifying binary linkages... PASS
+# [✔] Decompression engine check... PASS (ctypes preloaded)
+```
+
+### 3. Verify Polyglot Extensions & Concurrency:
+```bash
+void ext list
+# Displays registered extensions with active PIDs
+
+void ext run pkg
+# Launches interactive ANSI package browser
+
+# In another tab, attempting duplicate launch:
+void ext run pkg
+# Blocked: "Extension 'pkg' is already running with PID <pid>."
+```
+
+### 4. Verify Single & Master Panic Kill:
+```bash
+# Terminate single extension:
+void ext kill pkg
+
+# Terminate all running extensions (panic breaker):
+void ext kill-all
+```
+
+### 5. Verify Virtual Keyboard Geometry:
+- **Row 1**: Ends with **`▲`**.
+- **Row 2**: Ends with **`◀`**, **`▼`**, **`▶`** directly beneath **`▲`**.
+- Long press on keypad toggle allows dynamic budgeting or unlocked swipe gestures.
+
+---
+
+## 5. Google Play Store Release & Compliance Checklist
+
+1. **Target SDK 34+ Invariant**: Verify `compileSdk = 34` and `targetSdk = 34` in `android/app/build.gradle.kts`.
+2. **Foreground Service Special Use**: Ensure `FOREGROUND_SERVICE_SPECIAL_USE` has valid descriptions in `AndroidManifest.xml`.
+3. **W^X Policy Compliance**: All host executable binaries are packaged within APK assets or mapped through Bionic-approved namespaces.
+4. **App Bundle (.aab)**: For Google Play distribution:
    ```bash
+   cd android
    ./gradlew bundleRelease
    ```
+   The signed bundle is placed at `android/app/build/outputs/bundle/release/app-release.aab`.

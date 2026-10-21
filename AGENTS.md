@@ -1,73 +1,75 @@
-# AGENTS.md - Governance & Operational Rules for Hybrid Engine
+# AGENTS.md — Governance & Operational Directives for Sovereign VoidTerm
 
-## 1. Project Mission & Identity
-The **Hybrid Engine** is a high-performance Android execution environment combining:
-- **UI / JNI Layer**: Kotlin + C++ `libvterm` terminal emulator.
-- **IPC Broker**: Asynchronous Rust (`tokio`) host daemon for command interception & stream multiplexing.
-- **Host WASM Engine**: WasmEdge embedded via Android NDK for zero-latency execution & native host API functions.
-- **Guest Linux Engine**: AVF (`crosvm`) hardware-isolated microVM for standard `glibc` ELF workloads.
-- **Hypervisor Bus**: `virtio-vsock` (Host CID 2 <-> Guest CID) for zero-network-overhead communication.
+## 1. Project Mission & Sovereign Identity
+**VoidTerm** is a sovereign, rootless Android terminal emulator, POSIX execution container, and polyglot extension platform running natively on Android (`aarch64` / Bionic libc). It completely deprecates legacy Termux branding, package references, and external helper applications.
+
+The core architecture combines:
+- **Terminal UI & Input Layer**: Monospace 60 FPS `TerminalSurfaceView`, 10 customizable themes, and a dual-row virtual keyboard featuring a physical inverted-T arrow cluster (`▲` directly over `◀`, `▼`, `▶`) with dynamic key budgeting and unlocked swipe scrolling.
+- **Session & Tab Manager**: Multi-session lifecycle manager with tab pinning (`isPinned`) for mission-critical tasks, dynamic CWD context propagation, visual overview (`TabsCardBottomSheet`), and global Linux keybindings.
+- **Sovereign VoidFS Container**: Self-contained POSIX root (`$PREFIX`), dynamic `.bashrc` prompt (`username:directory$`), custom directory lister (`voidls`), and package manager (`voidpkg`) hardened against dynamic linker failures.
+- **Polyglot Extensions Platform**: Python & Node.js SDKs (`void_extensions.py`, `void_extensions.js`), standardized `metadata.json` schemas, interactive ANSI terminal browsers (`/pkg`, `/file`), and unified CLI router (`void ext`).
+- **Embedded Zero-Trust OS API Gateway**: Native Unix Domain Socket (`void_api.sock`) + HTTP loopback gateway (`VoidApiServer`), granular Permissions Gatekeeper (`PermissionGatekeeper`), and partial WakeLock-protected AlarmManager task scheduling (`CronBroadcastReceiver`).
+- **NodeOS Concurrency Watchdog**: Singleton process PID validation via `/proc/<pid>/stat` and bi-daily telemetry sync at `00:01` and `12:01` into `agy_nodeos.db`.
 
 ---
 
 ## 2. Core Operational Directives (STRICT ENFORCEMENT)
 
 ### Rule 1: Mandatory Context Synchronization (`CONTEXT.md`)
-1. **Pre-Task Check**: Every agent session or subagent invocation MUST review [CONTEXT.md](file:///data/data/com.termux/files/home/Projects/polymath-void/hybrid-engine/CONTEXT.md) before making modifications.
-2. **Atomic Context Updates**: Whenever any subsystem is modified, designed, refactored, or tested, the agent MUST immediately update [CONTEXT.md](file:///data/data/com.termux/files/home/Projects/polymath-void/hybrid-engine/CONTEXT.md).
-3. **No Phantom State**: Never introduce architectural components, configuration flags, or protocol changes without recording them in [CONTEXT.md](file:///data/data/com.termux/files/home/Projects/polymath-void/hybrid-engine/CONTEXT.md).
+1. **Pre-Task Check**: Every agent session or subagent invocation MUST review [`CONTEXT.md`](file:///data/data/com.termux/files/home/Projects/polymath/polymath-void-term/hybrid-engine/CONTEXT.md) before making modifications.
+2. **Atomic Context Updates**: Whenever any subsystem is modified, designed, refactored, or tested, the agent MUST immediately update [`CONTEXT.md`](file:///data/data/com.termux/files/home/Projects/polymath/polymath-void-term/hybrid-engine/CONTEXT.md).
+3. **No Phantom State**: Never introduce architectural components, configuration flags, or protocol changes without recording them in [`CONTEXT.md`](file:///data/data/com.termux/files/home/Projects/polymath/polymath-void-term/hybrid-engine/CONTEXT.md).
 
 ### Rule 2: Category-Based Event Logging Protocol
-Every event, modification, architectural decision, or validation test MUST be appended to the **Event Log** section in [CONTEXT.md](file:///data/data/com.termux/files/home/Projects/polymath-void/hybrid-engine/CONTEXT.md) using the following strict category schema:
+Every event, modification, architectural decision, or validation test MUST be appended to the **Event Log** section in [`CONTEXT.md`](file:///data/data/com.termux/files/home/Projects/polymath/polymath-void-term/hybrid-engine/CONTEXT.md) using the following strict category schema:
 
 | Category Tag | Domain / Scope |
 | :--- | :--- |
 | `[ARCHITECTURE]` | High-level system design, pipeline modifications, AIDL/JNI boundaries. |
-| `[BROKER_IPC]` | Rust daemon, Tokio async routing, multiplexer channels, IPC protocol. |
-| `[WASM_ENGINE]` | WasmEdge NDK integration, WASM host functions, Termux:API replacements. |
-| `[AVF_GUEST]` | Android Virtualization Framework, crosvm, kernel image, guest init daemon. |
-| `[VSOCK_BUS]` | `virtio-vsock` configuration, CID routing (Host CID 2 / Guest CID), framing. |
-| `[TERMINAL_UI]` | Kotlin UI, C++ `libvterm` bridge, PTY rendering, ANSI/VT escape sequences. |
-| `[BUILD_ENV]` | Toolchain setups (Cargo, NDK Clang, CMake, Gradle), Termux environment. |
-| `[TEST_BENCH]` | Unit tests, mock vsock benchmarks, WASM execution latency benchmarks. |
-
-#### Event Log Entry Format:
-```markdown
-- **YYYY-MM-DD HH:MM UTC** `[CATEGORY_TAG]` <Short Summary>
-  - **Details**: Specific technical actions taken or decisions made.
-  - **Impacted Components**: `path/to/component` or subsystem name.
-  - **Outcome / Status**: Verified, Pending, or In Progress.
-```
+| `[TERMINAL_CORE]` | TerminalService, DynamicCoreLoader, VoidFS, rootless POSIX bootstrap. |
+| `[EXTENSIONS_ENGINE]`| Polyglot SDKs (Python/Node.js), `/pkg` & `/file` TUIs, `void-ext` CLI. |
+| `[OS_GATEWAY]` | Unix domain socket, HTTP fallback, permission gatekeeper, OS automation. |
+| `[KEYPAD_INPUT]` | KeyCatalog, inverted-T cluster, dynamic budgeting, gesture scrolling. |
+| `[SESSION_TABS]` | SessionManager, tab pinning, tab renaming, TabsCardBottomSheet. |
+| `[NODEOS_TELEMETRY]`| NodeOS concurrency PID tracking, SQLite schema, bi-daily AlarmManager sync. |
+| `[BUILD_CI]` | Gradle wrapper, Rust static musl toolchain, GitHub Actions workflows. |
 
 ---
 
 ## 3. Subsystem Invariants & Technical Rules
 
-### 1. IPC Broker (Rust)
-- **Runtime**: Pure asynchronous Rust using `tokio` (multi-thread or current-thread runtime adapted for mobile core affinity).
-- **Concurrency & Non-Blocking**: No blocking synchronous syscalls inside Tokio task loops. Use `tokio::select!` for stream multiplexing.
-- **Protocol Framing**: Inter-process and vsock messages must use strict length-prefixed binary or lightweight CBOR/Protobuf serialization. Avoid bloated JSON on hot data paths.
-- **Graceful Degradation**: If the guest microVM is booting or offline, fast-fail or queue commands with status notifications back to the UI terminal.
+### 1. In-Process Reload Invariant (No `am broadcast`)
+- **Strict Prohibition**: Never invoke `am broadcast` from shell scripts or background processes to notify the Android host app. Unprivileged UID calls trigger `SecurityException: Permission Denial: broadcast asks to run as user -2`.
+- **Filesystem Trigger Standard**: All hot-reload signals must write a touch stamp to `$PREFIX/var/run/.reload_trigger`. `TerminalService` monitors this path using an in-process `FileObserver` and triggers `DynamicCoreLoader.reload(context)` safely.
 
-### 2. Host WASM Engine (WasmEdge NDK)
-- **Zero Hypervisor Overhead**: Run CI automations, lightweight scripts, string parsing, and host utilities in WASM directly on Android Bionic.
-- **Host Function Security**: All Android native capabilities (battery, clipboard, network, sensors) registered as WASM host functions must be capability-gated.
-- **Zero-Copy Buffers**: When passing byte arrays or strings across WASM memory boundary, use direct memory pointers rather than intermediate allocations.
+### 2. Inverted-T Keypad Geometry Invariant
+- **Cluster Positions**:
+  - Upper Row (Row 1): Functions, `ESC`, `TAB`, symbols, terminating strictly with **`▲`**.
+  - Lower Row (Row 2): Modifiers (`CTRL`, `ALT`), `/`, `~`, `-`, terminating strictly with **`◀`**, **`▼`**, **`▶`**.
+  - `▲` sits directly above `▼`, flanked by `◀` on the left and `▶` on the right.
+- **Budgeting**: Buttons must dynamically budget widths when locked to fit screen dimensions without clipping.
 
-### 3. Guest Linux VM & AVF
-- **Hypervisor Boundary**: The microVM runs under `crosvm` managed by Android's `VirtualizationService` (AIDL).
-- **No Emulation Penalties**: VM executes raw ARM64/AArch64 `glibc` ELF binaries natively.
-- **Vsock Topology**: Android Host always binds to `CID 2`. The guest VM connects to Host CID 2, and the guest listener daemon binds to `VMADDR_CID_ANY` on designated port (default: CID 3, port 8000).
-- **Zero-Root ext4 Provisioning**: Virtual disk images (`disk.img`) are dynamically allocated as sparse files, formatted via Android user-space `/system/bin/mke2fs`, and populated with Debian rootfs via `/system/bin/e2fsdroid` without root privileges.
-- **Guest Daemon Autostart**: Systemd unit (`voidterm-daemon.service`) and `multi-user.target.wants` symlinks are embedded into rootfs during provisioning to autostart `guest_daemon` as PID 1 service.
+### 3. Zero-Trust Permission Gatekeeper Invariant
+- **Interactive Prompts**: Extensions must not receive unprompted access to sensitive OS APIs.
+- **ACL Options**: On first endpoint invocation, the user must be offered: *Allow Once*, *Allow for 7 Days*, *Always Allow*, or *Deny*.
+- **Grant Isolation**: Permissions are keyed strictly by `extensionId:endpoint`.
 
-### 4. Terminal UI / JNI Layer
-- **libvterm Integrity**: Render terminal grid states through C++ `libvterm` wrapper.
-- **Thread Safety**: Ensure all JNI callbacks to Kotlin UI run on main/render thread or through dedicated thread-safe frame queues.
+### 4. NodeOS Concurrency & Process Singleton Invariant
+- **PID Verification**: When an extension is launched, `void_ext_router.py` must record its PID and verify `/proc/<pid>/stat` before spawning to prevent duplicate runtime instances.
+- **Panic Switches**: Both single extension termination (`void ext kill <id>`) and master panic termination (`void ext kill-all` / GUI panic button) must be maintained and verified.
+
+### 5. Memory & Asynchronous Safety (Android LMK)
+- Android's Low Memory Killer terminates heavy processes without warning. Keep test runs and sub-processes single-threaded; never use unrestricted parallel jobs (`make -j$(nproc)` is prohibited).
+- **Node.js**: Never use `Promise.all()` for parallel API calls. Await sequentially (`for...of`).
+- **SSE Streams**: Always implement string buffer split loops (`buffer.indexOf("\n\n")`).
 
 ---
 
-## 4. Environment & Tooling Rules (Android Termux)
-- **Path Resolution**: Follow standard Termux paths (`/data/data/com.termux/files/usr/`, `$HOME/`).
-- **Toolchain Standard**: Use native compilers (`clang`, `rustc`, `cargo`, `cmake`) configured for `aarch64-linux-android`.
-- **Zero Resource Waste**: Maintain clean dependencies and minimize unnecessary runtime overhead.
+## 4. Verification & QA Standard
+Before committing changes to any language (Kotlin, Rust, Python, JavaScript):
+1. **Universal QA Analyzer**:
+   ```bash
+   python3 ~/.gemini/config/skills/qa-analyzer/scripts/analyzer.py android/
+   ```
+2. **Interface Reference Integrity**: Verify all imported symbols, types, and methods exist before finalizing edits.
+3. **Smoke Check**: Test script executions via CLI (`python3 voidpkg.py --help`, `python3 void_ext_router.py list`).

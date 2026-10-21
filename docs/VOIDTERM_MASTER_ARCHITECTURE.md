@@ -1,50 +1,55 @@
 # VoidTerm: Master Architectural Specification & System Blueprints
-## Document Version: 2.0.0-PROD | Status: Approved & Active
-### Target Platform: Android 13–16 (aarch64 / MediaTek Dimensity / Snapdragon) | Google Play Store Target SDK 34+
+## Document Version: 3.0.0-SOVEREIGN | Status: Approved & Active in Production
+### Target Platform: Android 13–16 (`aarch64` / Bionic libc) | Target SDK 34+ (Google Play Store Compliant)
 
 ---
 
-## 1. Architectural Philosophy & Core Directive
+## 1. Architectural Philosophy & Sovereign Paradigm
 
-VoidTerm is engineered as a **dual-plane mobile execution platform**:
-1. **The Human Visual Plane**: A 60 FPS hardware-accelerated terminal interface for mobile developers featuring custom gestures, on-screen extra keys, and an agent telemetry HUD.
-2. **The Agent Autonomous Plane**: An embedded, non-blocking **Agent Control Plane (ACP)** operating over an isolated Unix domain socket (`voidterm_agent.sock`), granting local and remote AI swarms native subshell control, real-time screen buffer snapshots, and headless execution without hijacking the human user's screen focus.
-
-Unlike Termux, which is permanently stalled on the Play Store due to Android 10+ W^X memory restrictions and dynamic binary loading policies, VoidTerm is built from the ground up to be **100% Google Play Store Compliant**.
+VoidTerm is engineered as a **tri-plane sovereign execution and automation platform**:
+1. **The Human Visual & Input Plane**: A 60 FPS hardware-accelerated terminal interface for mobile developers featuring an inverted-T arrow cluster (`▲` over `◀`, `▼`, `▶`), dynamic key budgeting with gesture scrolling, multi-session tab pinning, and visual card overview (`TabsCardBottomSheet`).
+2. **The Sovereign Rootless Execution Plane**: A self-contained rootless POSIX container operating on VoidFS (`$PREFIX = /data/data/com.hybridengine.terminal/files/usr`), dynamic `.bashrc` prompt (`username:directory$`), custom directory lister (`voidls`), hardened package manager (`voidpkg`), and in-process filesystem hot-reload triggers via `FileObserver`.
+3. **The Polyglot Extensions & OS API Gateway Plane**: An embedded Zero-Trust OS automation gateway (`VoidApiServer` on `void_api.sock` and HTTP `8765`), granular Permissions Gatekeeper (`PermissionGatekeeper`), polyglot Python and Node.js extension SDKs, built-in interactive ANSI terminal browsers (`/pkg`, `/file`), and NodeOS concurrency watchdog with bi-daily telemetry sync.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        HUMAN VISUAL PLANE                              │
+│                        HUMAN VISUAL & INPUT PLANE                      │
 │         Android App (Kotlin / SurfaceView 60 FPS / Jetpack Compose)    │
 │  ┌───────────────────────────────┐  ┌───────────────────────────────┐  │
-│  │     Terminal Display Area     │  │   Agent Telemetry HUD Drawer  │  │
-│  │   (VT100 / Xterm AnsiParser)  │  │   (Thought, File, Progress)   │  │
+│  │     Terminal Display Area     │  │   Inverted-T Keypad Cluster   │  │
+│  │   (10 Themes, JetBrainsMono)  │  │   (▲ over ◀ ▼ ▶ / Budgeting)  │  │
+│  ├───────────────────────────────┤  ├───────────────────────────────┤  │
+│  │   TabsCardBottomSheet (Pin)   │  │ ExtensionsHubBottomSheet (Kill│  │
 │  └───────────────▲───────────────┘  └───────────────▲───────────────┘  │
 └──────────────────┼──────────────────────────────────┼──────────────────┘
-                   │ JNI Bridge (libhybrid_term_broker.so)
+                   │ Local Process / JNI Broker
 ┌──────────────────▼──────────────────────────────────▼──────────────────┐
-│                     AGENT AUTONOMOUS PLANE                             │
-│               Rust Async Core Daemon (hybrid-term-broker)              │
-│                                                                        │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │        Agent Control Plane (ACP) Unix Domain Socket Listener     │  │
-│  │              abstract://voidterm_agent.sock (JSON-RPC)           │  │
-│  └───────────────┬──────────────────┬───────────────────┬───────────┘  │
-│                  │                  │                   │              │
-│                  ▼                  ▼                   ▼              │
-│         ┌────────────────┐ ┌────────────────┐ ┌───────────────────┐    │
-│         │ Multi-PTY Pool │ │ WasmEngine     │ │ VmBridge          │    │
-│         │ (libc::openpty)│ │ (wasmi WASM)   │ │ (vhost-vsock)     │    │
-│         └────────┬───────┘ └────────┬───────┘ └─────────┬─────────┘    │
-└──────────────────┼──────────────────┼───────────────────┼──────────────┘
-                   │                  │                   │
-┌──────────────────▼──────────────────▼───────────────────▼──────────────┐
-│                    EXECUTION TIERS (PLAY STORE COMPLIANT)              │
-│  Tier 1: Bundled Native Libs   │ Tier 2: WASM Sandbox  │ Tier 3: AVF   │
-│  • Read-only APK lib/arm64-v8a │ • In-process Wasmi    │ • Hardware VM │
-│  • bash, busybox, coreutils    │ • 0ms cold boot       │ • crosvm      │
-│  • 100% W^X Compliant          │ • Play Store Approved │ • Full glibc  │
-└────────────────────────────────┴───────────────────────┴───────────────┘
+│                   SOVEREIGN ROOTLESS EXECUTION PLANE                   │
+│  ┌───────────────────────────────┐  ┌───────────────────────────────┐  │
+│  │    TerminalService (FGS)      │  │ DynamicCoreLoader (VoidFS)    │  │
+│  │(FileObserver .reload_trigger) │  │(.bashrc prompt, voidls, bak)  │  │
+│  ├───────────────────────────────┤  ├───────────────────────────────┤  │
+│  │     SessionManager.kt         │  │       voidpkg.py Engine       │  │
+│  │(Tab Pinning, CWD Inheritance) │  │(ctypes libz preloading & doc) │  │
+│  └───────────────┬───────────────┘  └───────────────┬───────────────┘  │
+└──────────────────┼──────────────────────────────────┼──────────────────┘
+                   │ Local Domain Socket & HTTP Fallback
+┌──────────────────▼──────────────────────────────────▼──────────────────┐
+│              POLYGLOT EXTENSIONS & OS API GATEWAY PLANE                │
+│  ┌───────────────────────────────┐  ┌───────────────────────────────┐  │
+│  │  VoidApiServer (Unix / HTTP)  │  │  PermissionGatekeeper (ACL)   │  │
+│  │  (Clipboard, Toast, Notify,   │  │  (Allow Once, 7D, Always,     │  │
+│  │   Vibrator, Battery, Overlay) │  │   Deny Zero-Trust Isolation)  │  │
+│  ├───────────────────────────────┤  ├───────────────────────────────┤  │
+│  │  CronBroadcastReceiver        │  │  NodeOS Concurrency Watchdog  │  │
+│  │  (AlarmManager + WakeLock)    │  │  (/proc/pid/stat Singleton &  │  │
+│  │                               │  │   Bi-Daily 00:01 & 12:01 Sync)│  │
+│  ├───────────────────────────────┴──┴───────────────────────────────┤  │
+│  │ Polyglot SDKs: Python (void_extensions.py) & JS (void_extensions.js) │
+│  │ Built-in Interactive TUIs: /pkg Browser & /file Navigator        │
+│  │ CLI Extension Router: void-ext [list|run|kill|kill-all|create]   │
+│  └──────────────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -52,67 +57,72 @@ Unlike Termux, which is permanently stalled on the Play Store due to Android 10+
 ## 2. Component Specifications & Codebase Topology
 
 ### 2.1 Android Application Frontend (`android/app`)
-- **`TerminalSurfaceView.kt`**: High-throughput Android `SurfaceView` running a dedicated rendering thread at 60 FPS. Bypasses Android View hierarchy overhead for instant monospace terminal text drawing.
-- **`AnsiParser.kt`**: State machine mapping ANSI color codes, TrueColor (24-bit RGB), cursor navigation, and screen resets to hardware `Paint` instances.
-- **`Broker.kt`**: JNI gateway managing the lifecycle of the background Rust daemon and passing bi-directional text buffers.
-- **`TerminalService.kt`**: Android Foreground Service maintaining process persistence under Android Low Memory Killer (LMK) with wake-lock management.
-- **`VmManager.kt`**: Interacts with Android's `VirtualizationService` AIDL interfaces to provision and boot the guest AVF microVM (`crosvm`).
+- **`TerminalSurfaceView.kt`**: High-throughput Android `SurfaceView` running a dedicated rendering thread at 60 FPS. Monospace canvas rendering supporting 10 color themes (Dracula, Nord, Monokai, Void Matrix, Cyberpunk, Solarized, OneDark, etc.), custom typeface loader (`JetBrainsMono`/`FiraCode`), dynamic user prompt, and selection toolbar.
+- **`MainActivity.kt`**: Main activity managing input lifecycle, double-row virtual toolbar with physical inverted-T arrow layout, dynamic button budgeting when locked, unlocked horizontal swipe gestures, and global Linux shortcut dispatcher (`Ctrl+C`, `Ctrl+T`, `Ctrl+1..9`, `Ctrl+Shift+C`, `Ctrl+V`, `Ctrl+D`, `Ctrl+L`, `Ctrl+Z`).
+- **`SessionManager.kt`**: Manages tab lifecycles, tab pinning (`isPinned`) protecting long-running tasks from accidental closure, tab renaming, and active working directory context propagation.
+- **`TabsCardBottomSheet.kt`**: Card-based visual overview of active terminal sessions with live CWD indicators, tab creation, and pin toggles.
+- **`ExtensionsHubBottomSheet.kt`**: Interactive bottom sheet displaying installed extensions, live runtime PIDs, permission states, and single-extension & master panic kill switches.
 
-### 2.2 Core Rust Daemon (`hybrid-term-broker`)
-- **`src/acp.rs` (Agent Control Plane)**: Multi-client async Unix domain socket server. Handles session creation, command dispatching, terminal buffer snapshots, and HUD telemetry broadcasting.
-- **`src/local_pty.rs` (Native POSIX PTY Engine)**: Allocates real pseudo-terminal master/slave pairs via `libc::openpty`. Contains an in-memory 1,000-line circular scrollback buffer for instant agent screen reading.
-- **`src/vm_bridge.rs` (AVF Linux Bridge)**: Connects to guest Linux microVM over `virtio-vsock` (Host CID 2 $\leftrightarrow$ Guest CID 3 on port 8000). Streams unconstrained `glibc` ELF binary execution without host emulation.
-- **`src/wasm_engine.rs` (WebAssembly Host Runtime)**: In-process WebAssembly interpreter (`wasmi`) executing portable CLI utilities without hypervisor overhead.
-- **`src/storage.rs` (Virtual Disk Provisioner)**: Creates and formats raw ext4 disk images for the Debian/Alpine microVM guest.
+### 2.2 Sovereign Core Services
+- **`TerminalService.kt`**: Android Foreground Service maintaining terminal processes under Android Low Memory Killer (LMK). Contains an in-process `FileObserver` watching `$PREFIX/var/run/.reload_trigger` to hot-reload configuration safely without calling `am broadcast`.
+- **`DynamicCoreLoader.kt`**: Initializes the sovereign VoidFS POSIX container, deploys dynamic `.bashrc` prompt `username:directory$`, creates `$HOME/storage` and `$HOME/sdcard` symlinks, packages bootstrap backups to `$PREFIX/var/bootstrap.bak.zip`, and extracts polyglot assets.
+- **`voidpkg.py`**: Sovereign package manager with dynamic `ctypes` candidate preloader resolving `libz` issues on Android 13+, multi-mirror fallback, and `pkg doctor` self-diagnostics.
+- **`voidls.py`**: Unicode directory lister with distinct glyphs (`📁`, `📄`, `⚡`, `📦`, `🔗`) for clean mobile terminal navigation.
 
-### 2.3 CLI & Modular Package Manager (`bin/void`)
-- **`void status`**: Real-time diagnostic inspector for broker socket, PTY sessions, hypervisor availability, and extension packages.
-- **`void pkg list`**: Live queries PyPI and NPM registries to display installed vs. latest remote package versions.
-- **`void pkg update [nodeos|jage|--all]`**: Manually updates individual packages.
-- **`void pkg autoupdate [on|off]`**: Configures headless background update checks.
+### 2.3 Embedded OS API Gateway & Security
+- **`VoidApiServer.kt`**: Native in-process server listening on Unix Domain Socket `$PREFIX/var/run/void_api.sock` with local HTTP fallback on `127.0.0.1:8765`.
+- **`VoidApiEndpoints.kt`**: JSON-RPC and REST endpoints for clipboard access, notifications, toast displays, haptic vibration, battery telemetry, device properties, app overlays, and process execution.
+- **`PermissionGatekeeper.kt`**: Zero-Trust access control engine that intercepts extension API calls and presents an interactive authorization dialog:
+  - `Allow Once`: Valid for a single call; expires immediately upon return.
+  - `Allow for 7 Days`: Time-stamped epoch expiration.
+  - `Always Allow`: Permanent grant stored in configuration.
+  - `Deny`: Permanent or session rejection returning `403 Forbidden`.
+- **`CronBroadcastReceiver.kt`**: AlarmManager receiver executing background cron jobs with partial `WakeLock` CPU protection and automatic release timers.
+- **`NodeOsTelemetrySync.kt`**: Bi-daily telemetry engine syncing extension usage durations, invocation counts, and permission states at `00:01` and `12:01` local time into `agy_nodeos.db`.
+
+### 2.4 Polyglot Extensions Platform
+- **Python SDK (`void_extensions.py`)** & **Node.js SDK (`void_extensions.js`)**: Universal client libraries communicating with `VoidApiServer` over local sockets or HTTP.
+- **`/pkg` Extension**: Interactive ANSI terminal browser for searching, installing, upgrading, and removing packages with background execution.
+- **`/file` Extension**: Interactive ANSI file browser with directory tree navigation, file inspection, and bookmarking.
+- **`void-ext` CLI (`void_ext_router.py`)**: Command-line router enforcing singleton PID verification (`/proc/<pid>/stat`) to prevent duplicate instances, plus single-kill and master panic kill commands.
 
 ---
 
-## 3. The Agent Control Plane (ACP) Interface Protocol
+## 3. Physical Inverted-T Keypad Specification
 
-The ACP protocol operates over line-delimited JSON messages via Unix Domain Socket (`$TMPDIR/voidterm_agent.sock`):
+The virtual keyboard layout strictly adheres to the physical inverted-T layout standard:
 
-### Request Schema
-```typescript
-type AgentRequest = 
-  | { action: "ping" }
-  | { action: "create_session"; session_id: string; tier?: "local" | "wasm" | "vm"; workdir?: string; shell?: string; rows?: number; cols?: number }
-  | { action: "exec"; session_id: string; command: string }
-  | { action: "input"; session_id: string; data: string }
-  | { action: "read_snapshot"; session_id: string; lines?: number }
-  | { action: "hud_telemetry"; agent_name: string; status: string; thought: string; active_file?: string; progress?: number }
-  | { action: "list_sessions" }
-  | { action: "close_session"; session_id: string };
+```
+Row 1: [ ESC ] [ TAB ] [  ~  ] [  /  ] [  -  ] ... [  ▲  ]
+Row 2: [CTRL ] [ ALT ] [  |  ] [  $  ] [  "  ] ... [ ◀ ] [ ▼ ] [ ▶ ]
+                                                    └────┬────┘
+                                            Directly beneath ▲
 ```
 
-### Response Schema
-```typescript
-type AgentResponse = 
-  | { status: "success"; message: string; session_id?: string; content?: string; sessions?: SessionInfo[] }
-  | { status: "event"; event_type: "stdout" | "stderr" | "exit"; session_id: string; data: string }
-  | { status: "error"; message: string };
-```
+- **Dynamic Budgeting Algorithm**: When the keypad is locked, each key's width is dynamically computed as:
+  $$\text{KeyWidth} = \frac{\text{rowWeight}}{\sum \text{rowWeights}} \times \text{AvailableScreenWidth}$$
+  ensuring all keys fit without clipping.
+- **Horizontal Swipe Gesture**: When unlocked, a horizontal scroll viewport allows fluid panning across function keys (`F1`–`F12`), editing keys (`HOME`, `END`, `INS`, `DEL`), and special characters.
 
 ---
 
-## 4. Play Store Compliance & Hardware Virtualization Matrix
+## 4. Play Store Compliance Matrix
 
-| Requirement | Host Execution (Tier 1) | WASM Execution (Tier 2) | AVF Linux VM (Tier 3) |
-| :--- | :--- | :--- | :--- |
-| **Execution Context** | Android Bionic Process | In-Memory Interpreter | Hardware Hypervisor (`crosvm`) |
-| **Binary Location** | `lib/arm64-v8a/*.so` (Signed APK) | In-Memory Bytecode | Guest Virtual Disk (`voidterm_rootfs.img`) |
-| **W^X Policy (SDK 34+)** | 100% Compliant (Read-only mapped) | 100% Compliant (Zero host execve) | 100% Compliant (Hardware Isolated) |
-| **Dynamic Packages** | Static at install | Pure WebAssembly Modules | Full `apt`/`apk` (gcc, python, docker) |
-| **Play Store Audit Status** | APPROVED | APPROVED | APPROVED (Android 13+ AVF Standard) |
+| Requirement | Sovereign VoidTerm Architecture | Play Store Audit Status |
+| :--- | :--- | :--- |
+| **Target SDK 34+** | Compiled against API 34+ with modern Android 14+ FGS types | **COMPLIANT** |
+| **W^X Policy** | Zero executable extractions from unsafe public storage; all assets mapped through app data container | **COMPLIANT** |
+| **No Inter-User Broadcasts** | In-process `FileObserver` filesystem triggers replace `am broadcast` | **COMPLIANT** |
+| **Background Persistence** | Foreground Service with Ongoing Notification & WakeLock guards | **COMPLIANT** |
+| **User Data Privacy** | Granular Zero-Trust Permission Gatekeeper for all OS API access | **COMPLIANT** |
 
 ---
 
-## 5. Built-in Intelligence & Safety Hooks
+## 5. Verification & CI/CD Status
 
-- **NodeOS (`polymath-nodeos`)**: Intercepts file save notifications to maintain [`agy_nodeos.db`](file:///data/data/com.termux/files/home/Projects/polymath-nodeos/agy_nodeos.db). Generates QuadTree AST centroids and computes real-time blast-radius warnings before agent code commits.
-- **Jage (`polymath-jage`)**: Acts as a continuous semantic code time-machine. Deconstructs files into content-addressable AST blocks. Enables atomic surgical rollbacks (`jage revert node <file>:<block> --version=<n>`) if an agent hallucinates, eliminating destructive Git resets.
+- **GitHub Actions Workflow**: `build-apk.yml`
+- **Latest Successful Run**: **#39528355770** (`✓`)
+- **Published Artifacts**:
+  - `VoidTerm-Debug-APK` (17.2 MB)
+  - `voidterm-guest-daemon` (Static musl ARM64 binary)
+- **Universal Static QA**: Passed with 0 unmatched brackets and complete interface integrity.

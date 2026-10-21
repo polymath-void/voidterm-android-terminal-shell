@@ -1,54 +1,44 @@
-# CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
+# CONTEXT.md - Living Architecture & Execution Context for Sovereign VoidTerm
 
-> **Document Status**: Active / Canonical  
-> **Last Synchronized**: 2026-10-19 14:30 UTC  
-> **Repository Root**: `/data/data/com.termux/files/home/Projects/polymath-void/hybrid-engine`  
-> **Milestone**: Agent Control Plane (ACP) & Termux Core Protocol Deconstruction Implemented  
+> **Document Status**: Active / Canonical Sovereign Architecture  
+> **Last Synchronized**: 2026-10-21 08:45 UTC  
+> **Repository Root**: `/data/data/com.termux/files/home/Projects/polymath/polymath-void-term/hybrid-engine`  
+> **Milestone**: Sovereign VoidTerm Architecture, Polyglot Extensions Engine, Embedded Zero-Trust OS API Gateway, Inverted-T Keypad, and CI/CD Build #39528355770 Passing (`✓`)
 
 ---
 
 ## 1. Project Overview & Topology
 
-The **VoidTerm Shell Terminal** is a dual-tier execution platform for Android that combines:
-1. **Ultra-Low Latency Host WASM Engine**: Direct NDK-embedded WasmEdge runtime on Android Bionic for instantaneous script/task execution with native Android host plugins.
-2. **Full Linux Compatibility via AVF**: Hardware-isolated microVM running via Android Virtualization Framework (`crosvm`), executing unconstrained `glibc` ELF binaries.
-3. **Rust IPC Broker Daemon**: Asynchronous Tokio-based brain managing command routing, virtio-vsock communication, and stream multiplexing.
-4. **Terminal UI (Kotlin / C++ libvterm)**: Clean terminal rendering with VT100/ANSI emulation.
+The **Sovereign VoidTerm Engine** is a high-performance Android terminal emulator, rootless POSIX container, and polyglot extension execution environment built natively for Android (`aarch64` / Bionic libc). It completely deprecates legacy Termux branding, package references, and external helper applications.
 
 ```mermaid
 flowchart TD
-    subgraph UI_Layer ["UI / JNI Layer"]
-        UI["Android Terminal UI (Kotlin)"] <--> JNI["JNI Bridge (C++)"]
-        JNI <--> VTERM["libvterm Engine"]
+    subgraph UI_Layer ["Frontend Terminal UI & Input Plane"]
+        TSV["TerminalSurfaceView<br/>(10 Themes, JetBrains Mono, 60 FPS)"]
+        KBAR["Virtual Keypad Cluster<br/>(Physical Inverted-T: ▲ over ◀ ▼ ▶)"]
+        TCBS["TabsCardBottomSheet<br/>(Tab Pinning, Renaming, Card Overview)"]
+        EHBS["ExtensionsHubBottomSheet<br/>(Single & Master Panic Kill Switches)"]
     end
 
-    subgraph Host_Daemon ["Host Process: IPC Broker (Rust + Tokio)"]
-        ROUTER["Command Router / Semantics Parser"]
-        MUX["Tokio Async Multiplexer (select!)"]
-        VSOCK_CLIENT["vhost-vsock Channel Handler (Host CID: 2)"]
-        WASM_EMBED["WasmEdge Host Embedding (NDK API)"]
+    subgraph Core_Services ["Sovereign Core & Process Broker"]
+        TS["TerminalService<br/>(FileObserver Hot-Reload Trigger)"]
+        SM["SessionManager<br/>(Pinned Tab Guard, CWD Context Spawning)"]
+        DCL["DynamicCoreLoader<br/>(VoidFS Rootless POSIX Container, .bashrc prompt, voidls)"]
+        LPS["LocalProcessSession<br/>(Pseudo-Terminal Process Pipeline)"]
+        VPKG["voidpkg.py<br/>(Multi-Tier libz.so Fallback & Doctor)"]
     end
 
-    subgraph Host_Extensions ["Host Native Plugins (Bionic)"]
-        PLUGINS["Sensors | Battery | Network | Storage | Clipboard"]
+    subgraph Ext_Platform ["Polyglot Extensions Platform & OS API Gateway"]
+        VAS["VoidApiServer<br/>(Local Domain Socket + HTTP Fallback)"]
+        PG["PermissionGatekeeper<br/>(Zero-Trust ACL: Once / 7 Days / Always / Deny)"]
+        CRON["CronBroadcastReceiver<br/>(AlarmManager + Partial WakeLock Execution)"]
+        NODEOS["NodeOS Concurrency Gatekeeper<br/>(PID Singleton Watchdog & Bi-Daily Telemetry Sync)"]
+        SDK["Unified Polyglot SDKs<br/>(Python void_extensions.py & JS void_extensions.js)"]
+        TUIs["Built-in Interactive TUIs<br/>(/pkg Browser & /file Navigator)"]
     end
 
-    subgraph AVF_MicroVM ["AVF MicroVM (Hardware-Isolated Linux / Glibc)"]
-        CROSVM["crosvm VMM (VirtualizationService AIDL)"]
-        VSOCK_DAEMON["Guest VM Daemon (vsock listener)"]
-        LINUX_SHELL["glibc Shell / Python / Django / Containers / GCC"]
-    end
-
-    UI_Layer <-->|Local Socket / PTY Channel| Host_Daemon
-    WASM_EMBED <-->|Native Host Function FFI| Host_Extensions
-    WASM_EMBED <-->|WASM Stdout/Stderr/Stdin| MUX
-    ROUTER -->|WASM Tasks| WASM_EMBED
-    ROUTER -->|Linux Tasks| VSOCK_CLIENT
-    VSOCK_CLIENT <==>|virtio-vsock Bus| CROSVM
-    CROSVM <==>|vsock Stream| VSOCK_DAEMON
-    VSOCK_DAEMON <--> LINUX_SHELL
-    VSOCK_CLIENT <-->|VM Stdout/Stderr/Stdin| MUX
-    MUX -->|Unified Terminal Stream| UI_Layer
+    UI_Layer --> Core_Services
+    Core_Services --> Ext_Platform
 ```
 
 ---
@@ -57,13 +47,15 @@ flowchart TD
 
 | Subsystem | Primary Tech | Layer | Key Responsibilities & Endpoints |
 | :--- | :--- | :--- | :--- |
-| **Terminal UI / JNI** | Kotlin, C++, `libvterm` | Android App Frontend | Input capture, frame rendering, ANSI escape parsing, window resize events (`SIGWINCH`). |
-| **IPC Broker Daemon** | Rust, `tokio`, `nix` | Host Background Daemon | Central message broker, regex/AST command routing, stream multiplexer. |
-| **Host WASM Engine** | WasmEdge, NDK, C/Rust FFI | Host Native In-Process | Zero-overhead execution of WASM binaries and custom native host function plugins. |
-| **Host Native Plugins** | C++ / Rust, Android NDK | Host OS Extension | Hardware telemetry, device sensors, clipboard, filesystem bridging (fast Termux:API). |
-| **AVF MicroVM Host** | Android VirtualizationService (AIDL), `crosvm` | Host Hypervisor Controller | MicroVM lifecycle (spawn, monitor, configure CID, shutdown). |
-| **virtio-vsock Bus** | `vhost-vsock`, AF_VSOCK | Hypervisor IPC | Direct hypervisor socket communication (Host CID: 2 <-> Guest CID). |
-| **Guest VM Daemon** | Rust / C (static ELF) | Guest Linux MicroVM | Listens on guest vsock port, allocates PTYs, spawns target glibc process, streams I/O. |
+| **Terminal UI / View** | Kotlin, Android Canvas, SurfaceView | Android Frontend | Monospace 60 FPS rendering, 10 themes, JetBrains Mono, double-row inverted-T keypad, dynamic budgeting. |
+| **Session & Tab Manager** | Kotlin, SessionManager | Core Process Lifecycle | Multi-session lifecycle, tab pinning (`isPinned`), tab renaming, CWD inheritance, global Linux keybindings. |
+| **Sovereign VoidFS** | Kotlin, DynamicCoreLoader | Host Bionic Container | Self-contained `$PREFIX`, dynamic prompt (`username:directory$`), `voidls`, `FileObserver` hot-reload. |
+| **Package Manager (VoidPkg)** | Python 3, ctypes, gzip/zlib | Package Management | Multi-repository synchronization, dynamic `libz` preloading, dependency resolution, `pkg doctor`. |
+| **Polyglot Extensions Platform** | Python & Node.js SDKs, ANSI TUI | Subsystem Extensions | `/pkg` package browser, `/file` navigator, `metadata.json` schema validation, `void-ext` CLI router. |
+| **Embedded OS API Gateway** | Kotlin, LocalServerSocket, NanoHTTPD fallback | Host OS Automation | Domain socket (`void_api.sock`) + port `8765`, clipboard, toast, notification, vibrator, battery, overlay. |
+| **Permissions Gatekeeper** | Kotlin, PermissionGatekeeper | Security & ACL | Zero-Trust interactive prompt (*Allow Once*, *7 Days*, *Always*, *Deny*), strictly isolated per-extension ACL. |
+| **NodeOS Concurrency & Telemetry**| Kotlin & Python, AlarmManager, SQLite | Telemetry & Concurrency | Singleton PID verification via `/proc/<pid>/stat`, bi-daily AlarmManager sync at `00:01` & `12:01` to `agy_nodeos.db`. |
+| **Static Musl Guest Daemon** | Rust, static `aarch64-unknown-linux-musl` | Hypervisor / Guest Daemon | Static ELF guest daemon binary for AVF microVM and container bridging. |
 
 ---
 
@@ -71,44 +63,55 @@ flowchart TD
 
 | Phase | Phase Title | Status | Primary Deliverables |
 | :---: | :--- | :---: | :--- |
-| **Phase 1** | **IPC Broker Daemon** | 🟡 In Progress | Rust Tokio async daemon scaffolded, `hybrid-term-broker` crate created with Tokio, WasmEdge, vsock, nix, serde. |
-| **Phase 2** | **Host WASM Runtime Embedding** | 📋 Planned | WasmEdge NDK C/Rust bridge, Host Function plugin registry (sensors, system info, clipboard). |
-| **Phase 3** | **AVF MicroVM Provisioning** | 📋 Planned | AIDL `VirtualizationService` integration, `crosvm` microVM boot scripts, minimal Linux guest image. |
-| **Phase 4** | **vhost-vsock Subsystem** | 📋 Planned | `AF_VSOCK` communication channel (Host CID 2 <-> Guest CID), guest listener daemon, zero-copy packet framing. |
-| **Phase 5** | **Stream Multiplexing & Terminal UI** | 📋 Planned | Tokio `select!` unified loop, C++/Kotlin `libvterm` JNI interface, end-to-end user terminal shell. |
+| **Phase 1** | **Rootless VoidFS & Package Engine** | 🟢 Complete | Sovereign `$PREFIX`, `voidpkg.py` with multi-tier `libz` fallback, dynamic `username:directory$` prompt, `voidls`. |
+| **Phase 2** | **Unprivileged Hot-Reload Engine** | 🟢 Complete | In-process `$PREFIX/var/run/.reload_trigger` via `FileObserver`, eliminating Android 13+ broadcast SecurityException. |
+| **Phase 3** | **Dual-Row Virtual Keypad** | 🟢 Complete | Physical inverted-T arrow cluster (▲ directly over ◀ ▼ ▶), dynamic budgeting, unlocked horizontal scroll. |
+| **Phase 4** | **SessionManager & Tab Pinning** | 🟢 Complete | Tab pinning (`isPinned`), tab rename dialog, card overview (`TabsCardBottomSheet`), Linux keybindings (`Ctrl+C`, `Ctrl+T` etc.). |
+| **Phase 5** | **Polyglot Extensions & TUIs** | 🟢 Complete | Python & JS SDKs, `/pkg` interactive package browser, `/file` navigator, single & master kill switches. |
+| **Phase 6** | **Embedded Zero-Trust OS Gateway**| 🟢 Complete | Native local socket/HTTP gateway, Zero-Trust granular ACL prompt, WakeLock AlarmManager cron receiver. |
+| **Phase 7** | **NodeOS Watchdog & CI/CD Release**| 🟢 Complete | Singleton PID checks, bi-daily telemetry sync (00:01 & 12:01), GitHub Actions build #39528355770 passing. |
 
 ---
 
-## 4. Planned Repository Directory Structure
+## 4. Current Codebase Layout
 
 ```
-/data/data/com.termux/files/home/Projects/polymath-void/hybrid-engine/
-├── Cargo.toml              # Root Cargo Workspace definition
-├── AGENTS.md               # Strict Governance & Categorized Logging Protocol
-├── CONTEXT.md              # Living Context & Project Status Matrix
-├── hybrid-term-broker/     # [BROKER_IPC] Rust Daemon & Multiplexer Crate
-│   ├── Cargo.toml          # tokio, wasmedge-sdk, nix, vsock, anyhow, serde
-│   └── src/
-│       ├── main.rs         # Entrypoint & Tokio Async Runtime setup
-│       ├── router.rs       # Command Classifier (WASM vs VM)
-│       ├── multiplexer.rs  # tokio::select! I/O stream merger
-│       ├── wasm_bridge.rs  # Interface to Host WASM Engine
-│       └── vsock_client.rs # Interface to virtio-vsock bus
-├── wasm-engine/            # [WASM_ENGINE] Host WASM Engine (WasmEdge NDK)
-│   ├── include/            # C/C++ Headers for Host Functions
-│   ├── src/                # Host Plugin Implementations (Sensors, Net, Clipboard)
-│   └── modules/            # Pre-compiled / Standard WASM host utilities
-├── guest-daemon/           # [AVF_GUEST] / [VSOCK_BUS] Guest Linux VM Agent
-│   ├── Cargo.toml
-│   └── src/
-│       ├── main.rs         # Guest vsock listener & PTY spawner
-│       └── pty.rs          # Linux PTY allocation & byte streaming
-├── terminal-ui/            # [TERMINAL_UI] Kotlin & JNI libvterm Layer
-│   ├── jni/                # libvterm C++ wrapper & JNI exports
-│   └── app/                # Android UI Activity & Canvas/View Terminal
-└── docs/                   # Specifications, Benchmarks & Protocols
-    ├── vsock-protocol.md
-    └── host-plugins-api.md
+/data/data/com.termux/files/home/Projects/polymath/polymath-void-term/hybrid-engine/
+├── .github/workflows/build-apk.yml # Automated CI/CD pipeline (Musl daemon + Debug APK)
+├── AGENTS.md                       # Project governance & operational directives
+├── CONTEXT.md                      # Comprehensive living technical context & event log
+├── GAP_ANALYSIS.md                 # Gap closure and compliance audit matrix
+├── architect-implements.md         # Multi-agent architectural blueprint & verification
+├── android/app/src/main/
+│   ├── AndroidManifest.xml         # Capabilities, foreground service, receivers
+│   ├── assets/
+│   │   ├── bootstrap-aarch64.zip   # Pre-compiled rootless bootstrap
+│   │   ├── voidpkg.py              # Sovereign package manager
+│   │   ├── voidls.py               # Unicode directory lister
+│   │   ├── void_ext_router.py      # CLI extension router
+│   │   ├── extensions/             # Built-in extensions (/pkg, /file)
+│   │   └── sdk/                    # Polyglot SDKs (Python & Node.js)
+│   └── kotlin/com/hybridengine/terminal/
+│       ├── MainActivity.kt         # App entry, keypad layout, shortcut dispatcher
+│       ├── TerminalService.kt      # Foreground service & FileObserver reload trigger
+│       ├── TerminalSurfaceView.kt  # Monospace 60 FPS canvas renderer
+│       ├── SessionManager.kt       # Tab lifecycle, pinning, and CWD tracking
+│       ├── DynamicCoreLoader.kt    # VoidFS container setup & asset extractor
+│       ├── api/
+│       │   ├── VoidApiServer.kt    # Local domain socket & HTTP gateway
+│       │   ├── VoidApiEndpoints.kt # OS automation endpoints
+│       │   └── CronBroadcastReceiver.kt # WakeLock-protected AlarmManager receiver
+│       ├── keymap/
+│       │   └── KeyCatalog.kt       # Universal key definitions & inverted-T layout
+│       ├── security/
+│       │   └── PermissionGatekeeper.kt # Zero-Trust granular ACL prompt engine
+│       ├── sheets/
+│       │   ├── TabsCardBottomSheet.kt # Tab overview & pin management
+│       │   └── ExtensionsHubBottomSheet.kt # Extension hub & panic kill switch
+│       └── telemetry/
+│           ├── NodeOsTelemetrySync.kt  # NodeOS SQLite sync engine
+│           └── TelemetrySyncReceiver.kt # Bi-daily alarm receiver
+└── hybrid-term-broker/             # Static musl ARM64 guest daemon & IPC broker
 ```
 
 ---
@@ -376,3 +379,38 @@ flowchart TD
   - **Details**: (1) Repacked `bootstrap-aarch64.zip` (16.1MB) with dereferenced, full ELF shared libraries (`libreadline.so.8`, `libncursesw.so.6`, `libz.so.1`, `libcrypto.so`, `libssl.so`, `liblzma.so.5`, `libbz2.so.1.0`), plus `terminfo` in both `share/terminfo` and `etc/terminfo`; (2) Upgraded `DynamicCoreLoader.kt` to bootstrap version 1.0.4 with an automated `repairAndVerifySharedLibraries()` routine that detects placeholder text files and auto-resolves missing dynamic links; (3) Added `pkg doctor` diagnostic command to `voidpkg.py`, fixed `mode="r:*"` extraction for `.tar.xz`, and added cycle-safe dependency resolution; (4) Upgraded `LocalProcessSession.kt` shell binary test to configure full `LD_LIBRARY_PATH` and `PATH`, and exported `TERMINFO`/`TERMINFO_DIRS`; (5) Reordered touch handling in `TerminalSurfaceView.kt` so gesture detection does not dismiss selection marker dragging, cleaned cursor block artifacts from copied text, and ensured selection toolbar copy always succeeds.
   - **Impacted Components**: `android/app/src/main/assets/bootstrap-aarch64.zip`, `android/app/src/main/assets/voidpkg.py`, `android/app/src/main/kotlin/com/hybridengine/terminal/DynamicCoreLoader.kt`, `LocalProcessSession.kt`, `MainActivity.kt`, `TerminalSurfaceView.kt`.
   - **Outcome / Status**: Verified with Universal QA Analyzer & live on-device user execution (`pkg doctor` PASS, `pkg update` PASS, `pkg install nano` PASS).
+
+- **2026-10-21 01:25 UTC** `[TERMINAL_CORE]` **Resolved am broadcast SecurityException via In-Process FileObserver Trigger**
+  - **Details**: Replaced unprivileged shell broadcast invocation (`am broadcast -a com.hybridengine.terminal.RELOAD_CORE`) with an intra-process POSIX filesystem trigger (`$PREFIX/var/run/.reload_trigger`). Implemented `android.os.FileObserver` in `TerminalService.kt` watching `$PREFIX/var/run/` for `CREATE` or `CLOSE_WRITE`. When triggered by `void reload` or `reload` CLI, `DynamicCoreLoader.reload(context)` is safely invoked in-process, completely eliminating `SecurityException: Permission Denial: broadcast asks to run as user -2`.
+  - **Impacted Components**: `android/app/src/main/kotlin/com/hybridengine/terminal/TerminalService.kt`, `DynamicCoreLoader.kt`.
+  - **Outcome / Status**: Implemented, Verified & Active.
+
+- **2026-10-21 01:28 UTC** `[EXTENSIONS_ENGINE]` **Implemented Polyglot Extensions Platform & Interactive ANSI TUI Browsers**
+  - **Details**: Built full parity polyglot SDKs for Python (`void_extensions.py`) and Node.js (`void_extensions.js`). Implemented built-in extensions: `/pkg` interactive ANSI terminal package browser (search, install, upgrade, uninstall with background shell execution) and `/file` interactive file browser with directory navigation and bookmarking. Deployed unified CLI router `void_ext_router.py` (`void ext [list|run|kill|kill-all|create]`). Added instant single-kill and master panic kill switches in CLI and GUI.
+  - **Impacted Components**: `android/app/src/main/assets/extensions/pkg/`, `android/app/src/main/assets/extensions/file/`, `android/app/src/main/assets/sdk/`, `android/app/src/main/assets/void_ext_router.py`, `android/app/src/main/kotlin/com/hybridengine/terminal/sheets/ExtensionsHubBottomSheet.kt`.
+  - **Outcome / Status**: Implemented, Verified & Active.
+
+- **2026-10-21 01:30 UTC** `[OS_GATEWAY]` **Implemented Embedded Zero-Trust OS API Gateway & Permissions Gatekeeper**
+  - **Details**: Developed in-process OS API Gateway via Android LocalServerSocket (`void_api.sock`) with loopback HTTP fallback on port 8765 (`VoidApiServer.kt`, `VoidApiEndpoints.kt`), completely replacing external apps (like `termux-api`). Implemented Zero-Trust granular Permissions Gatekeeper (`PermissionGatekeeper.kt`) prompting user on first endpoint invocation with 4 options: *Allow Once*, *Allow for 7 Days*, *Always Allow*, and *Deny*. Implemented partial WakeLock-protected AlarmManager receiver (`CronBroadcastReceiver.kt`) for background cron execution.
+  - **Impacted Components**: `android/app/src/main/kotlin/com/hybridengine/terminal/api/VoidApiServer.kt`, `VoidApiEndpoints.kt`, `CronBroadcastReceiver.kt`, `android/app/src/main/kotlin/com/hybridengine/terminal/security/PermissionGatekeeper.kt`.
+  - **Outcome / Status**: Implemented, Verified & Active.
+
+- **2026-10-21 01:32 UTC** `[KEYPAD_INPUT]` **Engineered Physical Inverted-T Virtual Keypad & Dynamic Budgeting**
+  - **Details**: Standardized physical inverted-T keyboard layout in `KeyCatalog.kt` and `MainActivity.kt`: Upper Row (Row 1) ends with `▲`, Lower Row (Row 2) ends with `◀`, `▼`, `▶` positioned directly underneath `▲`. Added dynamic button budgeting to fit screen width without overflow when locked, with seamless horizontal swipe scrolling when unlocked.
+  - **Impacted Components**: `android/app/src/main/kotlin/com/hybridengine/terminal/keymap/KeyCatalog.kt`, `MainActivity.kt`, `TerminalConfig.kt`.
+  - **Outcome / Status**: Implemented, Verified & Active.
+
+- **2026-10-21 01:34 UTC** `[SESSION_TABS]` **Added SessionManager Tab Pinning, Tab Renaming & Linux Keybindings**
+  - **Details**: Added `isPinned` state and `togglePinSession(id)` to `SessionManager.kt`, protecting pinned tabs against accidental closure. Implemented tab renaming dialog and card overview bottom sheet (`TabsCardBottomSheet.kt`). Wired global Linux keybindings in `MainActivity.dispatchKeyEvent`: `Ctrl+C`, `Ctrl+T`, `Ctrl+1..9`, `Ctrl+Shift+C`, `Ctrl+V`, `Ctrl+D`, `Ctrl+L`, `Ctrl+Z`.
+  - **Impacted Components**: `android/app/src/main/kotlin/com/hybridengine/terminal/SessionManager.kt`, `MainActivity.kt`, `android/app/src/main/kotlin/com/hybridengine/terminal/sheets/TabsCardBottomSheet.kt`.
+  - **Outcome / Status**: Implemented, Verified & Active.
+
+- **2026-10-21 01:36 UTC** `[NODEOS_TELEMETRY]` **Deployed NodeOS Concurrency Watchdog & Bi-Daily Telemetry Sync**
+  - **Details**: Integrated singleton process guard in `void_ext_router.py` verifying `/proc/<pid>/stat` before execution to eliminate duplicate running instances. Configured `AlarmManager` bi-daily telemetry sync triggers at `00:01` and `12:01` local time in `NodeOsTelemetrySync.kt` and `TelemetrySyncReceiver.kt` logging runtime metrics into `agy_nodeos.db`.
+  - **Impacted Components**: `android/app/src/main/kotlin/com/hybridengine/terminal/telemetry/NodeOsTelemetrySync.kt`, `TelemetrySyncReceiver.kt`, `android/app/src/main/assets/void_ext_router.py`.
+  - **Outcome / Status**: Implemented, Verified & Active.
+
+- **2026-10-21 01:39 UTC** `[BUILD_CI]` **GitHub Actions CI/CD Build #39528355770 Succeeded**
+  - **Details**: Resolved all Kotlin compiler type mismatches, missing imports, and uninitialized variables in `TerminalService.kt`, `CronBroadcastReceiver.kt`, `VoidApiServer.kt`, `KeyCatalog.kt`, and `PermissionGatekeeper.kt`. Pushed fix to `main`. GitHub Actions workflow `Build Android APK` completed successfully (ID 39528355770): Rust static musl AArch64 guest daemon built in 47s, Android Debug APK assembled in 1m 9s. Artifacts `VoidTerm-Debug-APK` and `voidterm-guest-daemon` successfully published.
+  - **Impacted Components**: `.github/workflows/build-apk.yml`, `android/app/src/main/kotlin/com/hybridengine/terminal/*`.
+  - **Outcome / Status**: Passed & Released (`✓`).

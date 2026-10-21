@@ -1,40 +1,73 @@
 # HYPERTEAM_CONTEXT — Pre-Compiled Workspace Manifest
 
-> Generated: 2026-10-20T19:43:23.910881+00:00
+> Generated: 2026-10-21T08:54:27.696390+00:00
 > Workspace: `/data/data/com.termux/files/home/Projects/polymath/polymath-void-term/hybrid-engine`
-> Total Files: 824
+> Total Files: 836
 
 ---
 
 ## `./`
 
-### `AGENTS.md` (5589 bytes)
-- # AGENTS.md - Governance & Operational Rules for Hybrid Engine
--   ## 1. Project Mission & Identity
+### `.hyperteam_context.json` (320982 bytes)
+- **Keys:** `generated_at`, `workspace`, `files`
+
+### `AGENTS.md` (6597 bytes)
+- # AGENTS.md — Governance & Operational Directives for Sovereign VoidTerm
+-   ## 1. Project Mission & Sovereign Identity
 -   ## 2. Core Operational Directives (STRICT ENFORCEMENT)
 -     ### Rule 1: Mandatory Context Synchronization (`CONTEXT.md`)
 -     ### Rule 2: Category-Based Event Logging Protocol
 -   ## 3. Subsystem Invariants & Technical Rules
--     ### 1. IPC Broker (Rust)
--     ### 2. Host WASM Engine (WasmEdge NDK)
+-     ### 1. In-Process Reload Invariant (No `am broadcast`)
+-     ### 2. Inverted-T Keypad Geometry Invariant
 
-### `CONTEXT.md` (53776 bytes)
-- # CONTEXT.md - Living Architecture & Execution Context for VoidTerm Shell Terminal
+### `CONTEXT.md` (73743 bytes)
+- # CONTEXT.md - Living Architecture & Execution Context for Sovereign VoidTerm
 -   ## 1. Project Overview & Topology
 -   ## 2. Subsystem Matrix & Interface Specifications
 -   ## 3. Phase Roadmap & Execution Milestones
--   ## 4. Planned Repository Directory Structure
+-   ## 4. Current Codebase Layout
 -   ## 5. Category-Based Event Log
 
-### `README.md` (5111 bytes)
-- # VoidTerm Shell Terminal
--   ## 🏛️ System Architecture Topology
--   ## Key Subsystems
--   ## Directory Structure
--   ## Building & Verification
--     ### Rust Daemon
--     ### Android Application
--   ## License
+### `GAP_ANALYSIS.md` (8507 bytes)
+- # VoidTerm Architectural Gap Analysis & Resolution Audit
+-   ## Sovereign Void-Architecture Transition & Compliance Certification
+-   ## EXECUTIVE SUMMARY
+-   ## 1. COMPREHENSIVE GAP RESOLUTION MATRIX
+-   ## 2. DETAILED SUBSYSTEM AUDITS & PROOFS
+-     ### 2.1 Android 13-16 Security Compliance
+-     ### 2.2 Embedded OS API Gateway & Permissions Gatekeeper
+-     ### 2.3 NodeOS Concurrency & Telemetry Sync
+
+### `HYPERTEAM_CONTEXT.md` (235016 bytes)
+- # HYPERTEAM_CONTEXT — Pre-Compiled Workspace Manifest
+-   ## `./`
+-     ### `AGENTS.md` (5589 bytes)
+-     ### `CONTEXT.md` (53776 bytes)
+-     ### `README.md` (5111 bytes)
+-     ### `termux_protocol_map.json` (776 bytes)
+-     ### `test_acp_client.py` (3812 bytes)
+-     ### `voidpkg.py` (14269 bytes)
+
+### `README.md` (9356 bytes)
+- # VoidTerm Sovereign Android Terminal Shell & Polyglot Engine
+-   ## 🏛️ Sovereign System Architecture
+-   ## ⚡ Key Architectural Features
+-     ### 1. Sovereign Rootless POSIX Container & VoidFS
+-     ### 2. Polyglot Extensions Engine & Built-In TUIs
+-     ### 3. Embedded Zero-Trust OS API Gateway
+-     ### 4. NodeOS Concurrency Watchdog & Bi-Daily Telemetry Sync
+-     ### 5. Physical Inverted-T Virtual Keypad & Dynamic Budgeting
+
+### `architect-implements.md` (10976 bytes)
+- # Sovereign VoidTerm Architecture & Multi-Agent Implementation Matrix
+-   ## 1. Executive Summary & Rootless Architecture
+-   ## 2. Multi-Agent Task Categorization & Skill Matrix
+-   ## 3. Detailed Component Implementations
+-     ### 3.1 Unprivileged Reload Fix (Resolving Broadcast SecurityException)
+-     ### 3.2 Dual-Row Keymap with Inverted-T Cluster
+-     ### 3.3 Zero-Trust Granular Permissions Gatekeeper
+-     ### 3.4 Concurrency Watchdog & Bi-Daily Telemetry Sync
 
 ### `termux_protocol_map.json` (776 bytes)
 - **Keys:** `OSC_TITLE`, `ALT_SCREEN_ENTER`, `ALT_SCREEN_EXIT`, `CURSOR_HOME`, `CLEAR_SCREEN`, `BRACKETED_PASTE_ENABLE`, `COLOR_RGB`, `RESET`
@@ -64,36 +97,125 @@
 
 ## `android/app/src/main/assets/`
 
-### `android/app/src/main/assets/voidpkg.py` (16209 bytes)
-- **Imports:** `os`, `sys`, `json`, `gzip`, `urllib.request`, `ssl`, `io`, `tarfile`, `subprocess`, `shutil`
-- **Function `ensure_dirs`** (L36)
-- **Function `get_ssl_context`** (L43)
-- **Function `load_repos`** (L60)
-- **Function `get_installed`** (L68)
-- **Function `update_catalog`** (L82)
-- **Function `load_catalog`** (L127)
-- **Function `search_packages`** (L138)
-- **Function `extract_ar`** (L156)
-- **Function `retarget_elf`** (L173)
-- **Function `fix_shebang`** (L198)
-- **Function `install_single_pkg`** (L215)
-- **Function `remove_package`** (L315)
-- **Function `list_installed`** (L334)
-- **Function `manage_repos`** (L345)
-- **Function `print_help`** (L372)
-- **Function `main`** (L384)
+### `android/app/src/main/assets/void_ext_router.py` (12435 bytes)
+- **Imports:** `os`, `sys`, `json`, `time`, `shutil`, `sqlite3`, `subprocess`
+- **Function `get_db_path`** (L28)
+- **Function `get_db`** (L34)
+- **Function `is_pid_alive`** (L56)
+- **Function `cmd_list`** (L61)
+- **Function `cmd_create`** (L105)
+- **Function `cmd_run`** (L161)
+- **Function `cmd_kill`** (L241)
+- **Function `cmd_kill_all`** (L267)
+- **Function `main`** (L288)
+
+### `android/app/src/main/assets/voidls.py` (5015 bytes)
+- **Imports:** `os`, `sys`, `stat`, `subprocess`, `typing.List`, `typing.Tuple`
+- **Function `get_glyph`** (L45)
+- **Function `get_color`** (L69)
+- **Function `format_size`** (L84)
+- **Function `parse_ls_output`** (L96)
+- **Function `list_directory`** (L129)
+- **Function `main`** (L156)
+
+### `android/app/src/main/assets/voidpkg.py` (30268 bytes)
+- **Imports:** `os`, `sys`, `json`, `urllib.request`, `ssl`, `io`, `tarfile`, `subprocess`, `shutil`, `ctypes`, `gzip`, `subprocess`, `zlib`
+- **Function `safe_decompress_gzip`** (L48)
+- **Function `ensure_dirs`** (L91)
+- **Function `get_ssl_context`** (L98)
+- **Function `load_repos`** (L115)
+- **Function `get_installed`** (L123)
+- **Function `update_catalog`** (L137)
+- **Function `load_catalog`** (L192)
+- **Function `search_packages`** (L203)
+- **Function `extract_ar`** (L221)
+- **Function `retarget_elf`** (L238)
+- **Function `fix_shebang`** (L263)
+- **Function `install_single_pkg`** (L280)
+- **Function `remove_package`** (L403)
+- **Function `list_installed`** (L422)
+- **Function `manage_repos`** (L433)
+- **Function `print_help`** (L460)
+- **Function `run_doctor`** (L473)
+- **Function `run_doctor`** (L526)
+- **Function `handle_clipboard_get`** (L581)
+- **Function `handle_clipboard_set`** (L587)
+- **Function `handle_toast_show`** (L596)
+- **Function `handle_notification_post`** (L604)
+- **Function `handle_vibrate`** (L615)
+- **Function `handle_battery_status`** (L622)
+- **Function `handle_wakelock_acquire`** (L626)
+- **Function `handle_wakelock_release`** (L635)
+- **Function `handle_intent_launch`** (L639)
+- **Function `handle_view_url`** (L648)
+- **Function `handle_cron_schedule`** (L656)
+- **Function `handle_cron_cancel`** (L666)
+- **Function `main`** (L676)
+- **Function `print_help_clipboard`** (L764)
+- **Function `print_help_toast`** (L771)
+- **Function `print_help_notification`** (L777)
+- **Function `print_help_vibrate`** (L783)
+- **Function `print_help_wakelock`** (L789)
+- **Function `print_help_intent`** (L796)
+- **Function `print_help_cron`** (L803)
+
+## `android/app/src/main/assets/extensions/file/`
+
+### `android/app/src/main/assets/extensions/file/metadata.json` (420 bytes)
+- **Keys:** `id`, `name`, `version`, `author`, `description`, `runtime`, `entry`, `singleton`, `permissions`, `grant_type`
+
+## `android/app/src/main/assets/extensions/file/scripts/`
+
+### `android/app/src/main/assets/extensions/file/scripts/file_browser.py` (8804 bytes)
+- **Imports:** `os`, `sys`, `shutil`, `tty`, `termios`, `subprocess`
+- **Function `get_glyph`** (L29)
+- **Function `format_size`** (L40)
+- **Function `get_entries`** (L49)
+- **Function `get_char`** (L82)
+- **Function `render`** (L95)
+- **Function `prompt_input`** (L144)
+- **Function `main`** (L149)
+
+## `android/app/src/main/assets/extensions/pkg/`
+
+### `android/app/src/main/assets/extensions/pkg/metadata.json` (441 bytes)
+- **Keys:** `id`, `name`, `version`, `author`, `description`, `runtime`, `entry`, `singleton`, `permissions`, `grant_type`
+
+## `android/app/src/main/assets/extensions/pkg/environments/`
+
+### `android/app/src/main/assets/extensions/pkg/environments/integrations.py` (466 bytes)
+- **Imports:** `os`, `sys`
+- **Function `on_register`** (L8)
+- **Function `on_cron`** (L11)
+
+## `android/app/src/main/assets/extensions/pkg/scripts/`
+
+### `android/app/src/main/assets/extensions/pkg/scripts/pkg_browser.py` (9846 bytes)
+- **Imports:** `os`, `sys`, `json`, `tty`, `termios`, `subprocess`
+- **Function `get_package_list`** (L28)
+- **Function `get_char`** (L85)
+- **Function `render`** (L100)
+- **Function `run_command`** (L160)
+- **Function `main`** (L176)
+
+## `android/app/src/main/assets/sdk/python/voidterm/`
+
+### `android/app/src/main/assets/sdk/python/voidterm/__init__.py` (7038 bytes)
+- **Imports:** `os`, `sys`, `json`, `socket`, `urllib.request`, `sqlite3`, `time`
+- **Class `VoidAPI`** (L18): methods=[__init__, call, toast, clipboard_get, clipboard_set, notify, vibrate, battery]
+- **Class `NodeOS`** (L90): methods=[get_db_path, get_connection, register, set_running, set_idle, is_running]
 
 ## `docs/`
 
-### `docs/BUILD_AND_DEPLOYMENT_GUIDE.md` (3817 bytes)
+### `docs/BUILD_AND_DEPLOYMENT_GUIDE.md` (5614 bytes)
 - # VoidTerm: Production Build & Deployment Guide
--   ## Step-by-Step Instructions for Compiling, Verifying, and Packaging VoidTerm
+-   ## Comprehensive Guide for Compiling, Verifying, and Packaging Sovereign VoidTerm
 -   ## 1. Prerequisites & Toolchain Setup
--   ## 2. Compiling the Rust Core Broker (`hybrid-term-broker`)
--     ### A. Build Standalone Daemon (for local testing & CI):
--     ### B. Cross-Compile Shared Library for Android JNI (`arm64-v8a`):
-- # Copy the compiled .so to the Android app jniLibs directory:
--   ## 3. Running End-to-End Agent Verification Tests
+-   ## 2. GitHub Actions Automated CI/CD Pipeline
+-     ### Inspecting Workflow Status:
+-     ### Downloading Pre-Built Artifacts:
+-   ## 3. Local Step-by-Step Compilation
+-     ### Step 1: Run Universal QA Static Analysis
 
 ### `docs/CODEBASE_FULL_CONTEXT.md` (190083 bytes)
 - # VoidTerm Hybrid-Engine Complete Codebase Context
@@ -105,15 +227,15 @@
 -     ### Rule 2: Category-Based Event Logging Protocol
 -   ## 3. Subsystem Invariants & Technical Rules
 
-### `docs/VOIDTERM_MASTER_ARCHITECTURE.md` (10169 bytes)
+### `docs/VOIDTERM_MASTER_ARCHITECTURE.md` (12763 bytes)
 - # VoidTerm: Master Architectural Specification & System Blueprints
--   ## Document Version: 2.0.0-PROD | Status: Approved & Active
--     ### Target Platform: Android 13–16 (aarch64 / MediaTek Dimensity / Snapdragon) | Google Play Store Target SDK 34+
--   ## 1. Architectural Philosophy & Core Directive
+-   ## Document Version: 3.0.0-SOVEREIGN | Status: Approved & Active in Production
+-     ### Target Platform: Android 13–16 (`aarch64` / Bionic libc) | Target SDK 34+ (Google Play Store Compliant)
+-   ## 1. Architectural Philosophy & Sovereign Paradigm
 -   ## 2. Component Specifications & Codebase Topology
 -     ### 2.1 Android Application Frontend (`android/app`)
--     ### 2.2 Core Rust Daemon (`hybrid-term-broker`)
--     ### 2.3 CLI & Modular Package Manager (`bin/void`)
+-     ### 2.2 Sovereign Core Services
+-     ### 2.3 Embedded OS API Gateway & Security
 
 ## `target/`
 
@@ -4191,6 +4313,6 @@
 
 | Worker | Owned Files |
 |--------|------------|
-| M1-Worker | `test_acp_client.py` |
-| M2-Worker | `voidpkg.py` |
-| M3-Worker | `android/app/src/main/assets/voidpkg.py` |
+| M1-Worker | `test_acp_client.py`, `voidpkg.py`, `android/app/src/main/assets/void_ext_router.py` |
+| M2-Worker | `android/app/src/main/assets/voidls.py`, `android/app/src/main/assets/voidpkg.py`, `android/app/src/main/assets/extensions/pkg/scripts/pkg_browser.py` |
+| M3-Worker | `android/app/src/main/assets/extensions/pkg/environments/integrations.py`, `android/app/src/main/assets/extensions/file/scripts/file_browser.py`, `android/app/src/main/assets/sdk/python/voidterm/__init__.py` |
