@@ -35,6 +35,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.card.MaterialCardView
 import com.hybridengine.terminal.sheets.TabsCardBottomSheet
 import com.hybridengine.terminal.sheets.ExtensionsHubBottomSheet
+import com.hybridengine.terminal.extensions.ExtensionManager
 
 class MainActivity : AppCompatActivity() {
 
