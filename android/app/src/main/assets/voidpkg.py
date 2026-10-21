@@ -8,6 +8,7 @@ import io
 import tarfile
 import subprocess
 import shutil
+import time
 
 SELF_DIR = os.path.dirname(os.path.abspath(__file__))
 PREFIX = os.path.abspath(os.path.join(SELF_DIR, ".."))
@@ -465,13 +466,44 @@ def install_single_pkg(pkg_name, catalog, installed, _visiting=None):
                 install_single_pkg(dep_name, catalog, installed, _visiting)
 
     url = pkg_data["repo_base"] + pkg_data["filename"]
-    print(f"\033[36m[*] Downloading {pkg_name} ({pkg_data.get('version', '')})...\033[0m")
+    version_tag = pkg_data.get('version', '')
+    print(f"\033[36m[*] Fetching {pkg_name} ({version_tag})...\033[0m")
     headers = {"User-Agent": "VoidPkg/1.0 (Android; AArch64)"}
     try:
         req = urllib.request.Request(url, headers=headers)
-        deb_bytes = urllib.request.urlopen(req, timeout=30, context=get_ssl_context()).read()
+        with urllib.request.urlopen(req, timeout=30, context=get_ssl_context()) as resp:
+            total_size = int(resp.headers.get("Content-Length", 0))
+            downloaded = 0
+            chunks = []
+            start_time = time.time()
+            last_print = 0
+
+            while True:
+                chunk = resp.read(65536)
+                if not chunk:
+                    break
+                downloaded += len(chunk)
+                chunks.append(chunk)
+                now = time.time()
+                if now - last_print >= 0.1 or (total_size and downloaded >= total_size):
+                    last_print = now
+                    elapsed = max(now - start_time, 0.001)
+                    speed_mb = (downloaded / (1024 * 1024)) / elapsed
+                    if total_size > 0:
+                        pct = int((downloaded / total_size) * 100)
+                        filled = int((pct / 100) * 20)
+                        bar = "=" * filled + (">" if filled < 20 else "")
+                        bar = bar.ljust(20, " ")
+                        mb_cur = downloaded / (1024 * 1024)
+                        mb_tot = total_size / (1024 * 1024)
+                        print(f"\r  \033[36m[{bar}]\033[0m \033[1;32m{pct:>3}%\033[0m ({mb_cur:.1f}/{mb_tot:.1f} MB) \033[33m{speed_mb:.1f} MB/s\033[0m", end="", flush=True)
+                    else:
+                        mb_cur = downloaded / (1024 * 1024)
+                        print(f"\r  \033[36m[*] {mb_cur:.1f} MB downloaded\033[0m \033[33m({speed_mb:.1f} MB/s)\033[0m", end="", flush=True)
+            print("")
+            deb_bytes = b"".join(chunks)
     except Exception as e:
-        print(f"\033[31m[!] Failed to download {pkg_name}: {e}\033[0m")
+        print(f"\n\033[31m[!] Failed to download {pkg_name}: {e}\033[0m")
         return False
 
     try:
@@ -487,9 +519,14 @@ def install_single_pkg(pkg_name, catalog, installed, _visiting=None):
     except Exception as e:
         print(f"\033[31m[!] Failed to extract payload for {pkg_name}: {e}\033[0m")
         return False
+        
+    all_members = tar.getmembers()
+    total_members = len(all_members)
     installed_files = []
+    last_ext_print = 0
     
-    for member in tar.getmembers():
+    print(f"\033[35m[→] Extracting & Deploying {pkg_name} files...\033[0m")
+    for i, member in enumerate(all_members):
         name = member.name
         idx = name.find("files/usr/")
         if idx == -1: continue
@@ -518,6 +555,18 @@ def install_single_pkg(pkg_name, catalog, installed, _visiting=None):
                 retarget_elf(target)
                 fix_shebang(target)
             installed_files.append(rel_path)
+
+        now = time.time()
+        if now - last_ext_print >= 0.15 or i == total_members - 1:
+            last_ext_print = now
+            pct = int(((i + 1) / total_members) * 100)
+            filled = int((pct / 100) * 20)
+            bar = "=" * filled + (">" if filled < 20 else "")
+            bar = bar.ljust(20, " ")
+            base = os.path.basename(rel_path)[:22]
+            print(f"\r  \033[35m[{bar}]\033[0m \033[1;32m{pct:>3}%\033[0m ({i+1}/{total_members}) \033[90m{base}\033[0m    ", end="", flush=True)
+
+    print("")
 
     installed[pkg_name] = {
         "version": pkg_data.get("version", ""),

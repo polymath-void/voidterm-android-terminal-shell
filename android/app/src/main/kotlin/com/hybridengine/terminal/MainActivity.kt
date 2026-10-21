@@ -390,6 +390,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        terminalSurface.onDimensionsChanged = { rows, cols ->
+            terminalService?.sessionManager?.getActiveSession()?.processSession?.resizePty(rows, cols)
+        }
+
         // 5. Connect Dynamic Config and Resource Reloader to Terminal UI
         DynamicCoreLoader.onConfigReloaded = {
             runOnUiThread {

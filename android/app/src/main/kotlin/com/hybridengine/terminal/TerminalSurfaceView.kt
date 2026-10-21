@@ -58,6 +58,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
 
     var onCwdPollRequested: (() -> Unit)? = null
     var onUrlClicked: ((String) -> Unit)? = null
+    var onDimensionsChanged: ((rows: Int, cols: Int) -> Unit)? = null
     val detectedLinks = mutableListOf<LinkDetector.DetectedLink>()
 
     // Sticky modifier keys
@@ -756,6 +757,11 @@ class TerminalSurfaceView @JvmOverloads constructor(
      * Safely appends and parses new terminal output.
      */
     fun appendOutput(rawOutput: String) {
+        if (rawOutput.contains("\u001b[2J") || rawOutput.contains("\u001b[H\u001b[2J") || rawOutput.contains("\u001b[2J\u001b[H")) {
+            synchronized(terminalLines) {
+                terminalLines.clear()
+            }
+        }
         val styledLines = ansiParser.parseLines(rawOutput)
         synchronized(terminalLines) {
             terminalLines.addAll(styledLines)
@@ -773,6 +779,11 @@ class TerminalSurfaceView @JvmOverloads constructor(
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+        val charWidth = textPaint.measureText("W").coerceAtLeast(10f)
+        val lineHeight = (textPaint.fontSpacing).coerceAtLeast(15f)
+        val cols = (width / charWidth).toInt().coerceAtLeast(20)
+        val rows = (height / lineHeight).toInt().coerceAtLeast(10)
+        onDimensionsChanged?.invoke(rows, cols)
         triggerRender()
     }
 

@@ -27,19 +27,26 @@ CLR_BG_SEL = "\033[44;37m"
 
 def get_char():
     fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
     try:
-        tty.setraw(fd)
-        ch = sys.stdin.read(1)
-        if ch == "\x1b":
-            ch2 = sys.stdin.read(1)
-            if ch2 == "[":
-                ch3 = sys.stdin.read(1)
-                return f"\x1b[{ch3}"
-            return "\x1b"
-        return ch
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        old = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+            if ch == "\x1b":
+                ch2 = sys.stdin.read(1)
+                if ch2 == "[":
+                    ch3 = sys.stdin.read(1)
+                    return f"\x1b[{ch3}"
+                return "\x1b"
+            return ch
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+    except Exception:
+        try:
+            line = sys.stdin.readline()
+            return line.strip()[:1] if line else "q"
+        except Exception:
+            return "q"
 
 def load_extensions():
     extensions = []

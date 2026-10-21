@@ -59,6 +59,14 @@ class AnsiParser {
             sanitized = sanitized.replace(Regex(".\b"), "")
         }
 
+        // Strip OSC sequences (e.g., window title \u001b]0;...\u0007)
+        sanitized = sanitized.replace(Regex("\u001B\\][^\u0007\u001B]*[\u0007\u001B\\\\]"), "")
+
+        // Strip non-SGR CSI control sequences (e.g. \u001b[2J, \u001b[H, \u001b[?25h, \u001b[?1049h, \u001b[2K)
+        // Keeps color sequences: \u001b[...m
+        sanitized = sanitized.replace(Regex("\u001B\\[[?=>]?[0-9;]*[a-ln-zA-LN-Z]"), "")
+        sanitized = sanitized.replace(Regex("\u001B[=>][0-9;]*[a-zA-Z]"), "")
+
         // 2. Check for Markdown Fenced Code Blocks (```)
         val trimmed = sanitized.trim()
         if (trimmed.startsWith("```")) {

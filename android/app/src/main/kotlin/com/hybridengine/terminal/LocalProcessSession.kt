@@ -2,16 +2,20 @@ package com.hybridengine.terminal
 
 import android.content.Context
 import android.os.Build
+import android.os.ParcelFileDescriptor
 import android.util.Log
 import java.io.BufferedReader
 import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.util.concurrent.Executors
 
 /**
  * LocalProcessSession: Manages real Linux / Android process execution,
- * piping bidirectional stdin/stdout/stderr directly to TerminalSurfaceView.
+ * running over a true POSIX pseudo-terminal (PTY) when available, with
+ * transparent fallback to standard process pipes.
  */
 class LocalProcessSession(
     private val context: Context,
@@ -22,41 +26,41 @@ class LocalProcessSession(
 
     private var process: Process? = null
     private var stdinWriter: OutputStreamWriter? = null
-    private val ioExecutor = Executors.newFixedThreadPool(2)
+    private var ptyMasterFd: Int = -1
+    private var ptyPid: Int = -1
+    private var pfd: ParcelFileDescriptor? = null
+    private val ioExecutor = Executors.newFixedThreadPool(3)
     @Volatile private var isRunning = false
     private var lastWorkingDir: String = voidFS.homeDir.absolutePath
 
     fun start(workingDir: File = voidFS.homeDir) {
-        if (isRunning && process?.isAlive == true) return
+        if (isRunning && isAlive()) return
 
         val shellBinary = resolveDefaultShell()
         val dir = if (workingDir.exists()) workingDir else context.filesDir
         lastWorkingDir = dir.absolutePath
         Log.i(TAG, "Starting shell process: $shellBinary in ${dir.absolutePath}")
 
-        val commandList = voidFS.buildExecutionCommand(shellBinary)
-        val pb = ProcessBuilder(commandList)
-        pb.directory(dir)
-
-        val env = pb.environment()
         val filesPath = context.filesDir.absolutePath
         val usrPath = "$filesPath/usr"
         val homePath = "$filesPath/home"
         val tmpPath = "$usrPath/tmp"
 
-        env["HOME"] = homePath
-        env["PREFIX"] = usrPath
-        env["TMPDIR"] = tmpPath
-        env["ENV"] = "$homePath/.bashrc"
-        env["TERM"] = "xterm-256color"
-        env["SHELL"] = shellBinary
-        env["LD_LIBRARY_PATH"] = "$usrPath/lib"
-        env["PATH"] = "$usrPath/bin:/system/bin:/system/xbin"
-        env["TERMINFO"] = "$usrPath/share/terminfo"
-        env["TERMINFO_DIRS"] = "$usrPath/share/terminfo:$usrPath/etc/terminfo"
-        env["VOIDTERM_VERSION"] = "1.0.0-alpha"
-        env["SSL_CERT_FILE"] = "$usrPath/etc/tls/cert.pem"
-        env["GODEBUG"] = "netdns=cgo"
+        val envMap = mutableMapOf<String, String>()
+        envMap["HOME"] = homePath
+        envMap["PREFIX"] = usrPath
+        envMap["TMPDIR"] = tmpPath
+        envMap["ENV"] = "$homePath/.bashrc"
+        envMap["TERM"] = "xterm-256color"
+        envMap["COLORTERM"] = "truecolor"
+        envMap["SHELL"] = shellBinary
+        envMap["LD_LIBRARY_PATH"] = "$usrPath/lib"
+        envMap["PATH"] = "$usrPath/bin:/system/bin:/system/xbin"
+        envMap["TERMINFO"] = "$usrPath/share/terminfo"
+        envMap["TERMINFO_DIRS"] = "$usrPath/share/terminfo:$usrPath/etc/terminfo"
+        envMap["VOIDTERM_VERSION"] = "1.0.0-alpha"
+        envMap["SSL_CERT_FILE"] = "$usrPath/etc/tls/cert.pem"
+        envMap["GODEBUG"] = "netdns=cgo"
 
         // Ensure executable permissions on all usr/bin scripts
         File(usrPath, "bin").listFiles()?.forEach { file ->
@@ -65,6 +69,65 @@ class LocalProcessSession(
                 file.setReadable(true, false)
             } catch (_: Exception) {}
         }
+
+        // 1. Try Native POSIX PTY First (Guarantees isatty=true, termios, and full TUI support)
+        if (isPtyLoaded) {
+            try {
+                val envArray = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
+                val argsArray = arrayOf("-l") // Login shell
+                val ptyRes = createSubprocessNative(shellBinary, argsArray, envArray, dir.absolutePath, 24, 80)
+                if (ptyRes != null && ptyRes.size >= 2 && ptyRes[0] >= 0) {
+                    ptyMasterFd = ptyRes[0]
+                    ptyPid = ptyRes[1]
+                    isRunning = true
+
+                    val parcelFd = ParcelFileDescriptor.adoptFd(ptyMasterFd)
+                    pfd = parcelFd
+                    val inStream = FileInputStream(parcelFd.fileDescriptor)
+                    val outStream = FileOutputStream(parcelFd.fileDescriptor)
+                    stdinWriter = OutputStreamWriter(outStream, Charsets.UTF_8)
+
+                    // Single unified PTY stream reader (stdout & stderr are multiplexed on PTY slave)
+                    ioExecutor.execute {
+                        try {
+                            val reader = InputStreamReader(inStream, Charsets.UTF_8)
+                            val buffer = CharArray(2048)
+                            var readChars: Int
+                            while (isRunning && reader.read(buffer).also { readChars = it } != -1) {
+                                onOutput(String(buffer, 0, readChars))
+                            }
+                        } catch (e: Exception) {
+                            if (isRunning) Log.w(TAG, "PTY reader closed: ${e.message}")
+                        }
+                    }
+
+                    // Background process exit monitor
+                    ioExecutor.execute {
+                        try {
+                            val exitCode = waitForProcessNative(ptyPid)
+                            Log.i(TAG, "Native PTY process $ptyPid exited with code $exitCode")
+                            if (isRunning) {
+                                onOutput("\r\n\u001b[33m[Process completed with code $exitCode]\u001b[0m\r\n")
+                            }
+                        } catch (_: Exception) {}
+                    }
+
+                    onOutput("\r\n\u001b[32m🚀 VoidTerm Shell Host Active (Native POSIX PTY Engine)\u001b[0m\r\n")
+                    val engineType = "VoidCore Shell Active [AArch64] | Engine: VoidFS Dynamic POSIX Architecture"
+                    onOutput("\u001b[36mEngine:\u001b[0m $engineType | \u001b[35mShell:\u001b[0m $shellBinary\r\n")
+                    onOutput("\u001b[33mType 'help' or 'void' to begin.\u001b[0m\r\n\r\n")
+                    return
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Native PTY spawn failed, falling back to ProcessBuilder: ${e.message}")
+            }
+        }
+
+        // 2. Standard Pipe-based Process Fallback
+        val commandList = voidFS.buildExecutionCommand(shellBinary)
+        val pb = ProcessBuilder(commandList)
+        pb.directory(dir)
+        pb.environment().putAll(envMap)
 
         try {
             val proc = pb.start()
@@ -146,8 +209,7 @@ class LocalProcessSession(
     }
 
     fun getWorkingDir(): String {
-        val proc = process ?: return lastWorkingDir
-        val pid = getProcessPid(proc) ?: return lastWorkingDir
+        val pid = if (ptyPid > 0) ptyPid else (process?.let { getProcessPid(it) } ?: return lastWorkingDir)
         return try {
             val cwdFile = File("/proc/$pid/cwd")
             if (cwdFile.exists()) {
@@ -178,13 +240,36 @@ class LocalProcessSession(
         }
     }
 
-    fun isAlive(): Boolean = isRunning && process?.isAlive == true
+    fun isAlive(): Boolean {
+        if (!isRunning) return false
+        if (ptyPid > 0) return true
+        return process?.isAlive == true
+    }
+
+    fun resizePty(rows: Int, cols: Int) {
+        if (ptyMasterFd >= 0 && isPtyLoaded) {
+            try {
+                setPtyWindowSizeNative(ptyMasterFd, rows, cols)
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed resizing PTY: ${e.message}")
+            }
+        }
+    }
 
     fun sendSignalSigInt() {
-        val proc = process ?: return
-        val pid = getProcessPid(proc) ?: return
+        if (ptyMasterFd >= 0) {
+            // Under POSIX PTY, writing ETX (0x03) sends SIGINT to the foreground process group
+            try {
+                stdinWriter?.apply {
+                    write("\u0003")
+                    flush()
+                }
+            } catch (_: Exception) {}
+        }
+
+        val pid = if (ptyPid > 0) ptyPid else (process?.let { getProcessPid(it) } ?: return)
         try {
-            // First inspect /proc/$pid/task/$pid/children to target active foreground child process
+            // Also probe child processes in procfs
             val childrenFile = File("/proc/$pid/task/$pid/children")
             val childPids = if (childrenFile.exists()) {
                 childrenFile.readText().trim().split(Regex("\\s+")).filter { it.isNotBlank() }
@@ -200,7 +285,6 @@ class LocalProcessSession(
                 }
                 Log.i(TAG, "SIGINT sent to active child process(es): ${childPids.joinToString()}")
             } else {
-                // Fallback to targeting shell process
                 val pb = ProcessBuilder("kill", "-2", "-$pid")
                 val p = pb.start()
                 val code = p.waitFor()
@@ -222,10 +306,23 @@ class LocalProcessSession(
 
     fun destroy() {
         isRunning = false
+        if (ptyPid > 0) {
+            try {
+                ProcessBuilder("kill", "-9", "$ptyPid").start()
+            } catch (_: Exception) {}
+            ptyPid = -1
+        }
+        if (ptyMasterFd >= 0) {
+            try {
+                pfd?.close()
+            } catch (_: Exception) {}
+            ptyMasterFd = -1
+        }
         try {
             process?.destroy()
         } catch (_: Exception) {}
         process = null
+        pfd = null
         stdinWriter = null
     }
 
@@ -264,5 +361,38 @@ class LocalProcessSession(
 
     companion object {
         private const val TAG = "LocalProcessSession"
+        private var isPtyLoaded = false
+
+        init {
+            try {
+                System.loadLibrary("void_pty")
+                isPtyLoaded = true
+                Log.i(TAG, "Native POSIX PTY engine (libvoid_pty.so) loaded successfully.")
+            } catch (e: Throwable) {
+                try {
+                    System.load("/data/data/com.hybridengine.terminal/files/usr/lib/libvoid_pty.so")
+                    isPtyLoaded = true
+                    Log.i(TAG, "Loaded libvoid_pty.so from /files/usr/lib/")
+                } catch (e2: Throwable) {
+                    Log.w(TAG, "libvoid_pty.so not loaded, pipe fallback active: ${e.message}; fallback: ${e2.message}")
+                }
+            }
+        }
+
+        @JvmStatic
+        private external fun createSubprocessNative(
+            cmd: String,
+            args: Array<String>,
+            envp: Array<String>,
+            cwd: String,
+            rows: Int,
+            cols: Int
+        ): IntArray?
+
+        @JvmStatic
+        private external fun setPtyWindowSizeNative(masterFd: Int, rows: Int, cols: Int): Int
+
+        @JvmStatic
+        private external fun waitForProcessNative(pid: Int): Int
     }
 }
