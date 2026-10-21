@@ -9,11 +9,16 @@ import sys
 import json
 import time
 import shutil
-import sqlite3
+try:
+    import sqlite3
+except ImportError:
+    sqlite3 = None
+
 import subprocess
 
 PREFIX = os.environ.get("PREFIX", "/data/user/0/com.hybridengine.terminal/files/usr")
 EXT_BASE = os.path.join(PREFIX, "etc", "extensions")
+FALLBACK_JSON = os.path.join(PREFIX, "var", "run", "extension_runtime.json")
 
 # ANSI Colors
 CLR_RESET = "\033[0m"
@@ -27,31 +32,61 @@ CLR_GRAY = "\033[90m"
 
 def get_db_path():
     workspace_db = "/data/data/com.termux/files/home/Projects/agy_nodeos.db"
-    if os.path.exists(workspace_db):
-        return workspace_db
-    return os.path.join(PREFIX, "agy_nodeos.db")
+    try:
+        if os.path.exists(workspace_db) and os.access(workspace_db, os.W_OK):
+            return workspace_db
+    except Exception:
+        pass
+    local_db = os.path.join(PREFIX, "var", "data", "agy_nodeos.db")
+    try:
+        os.makedirs(os.path.dirname(local_db), exist_ok=True)
+    except Exception:
+        pass
+    return local_db
+
+def load_json_state():
+    try:
+        if os.path.exists(FALLBACK_JSON):
+            with open(FALLBACK_JSON, "r", encoding="utf-8") as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def save_json_state(data):
+    try:
+        os.makedirs(os.path.dirname(FALLBACK_JSON), exist_ok=True)
+        with open(FALLBACK_JSON, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
+    except Exception:
+        pass
 
 def get_db():
-    p = get_db_path()
-    os.makedirs(os.path.dirname(p), exist_ok=True)
-    conn = sqlite3.connect(p, timeout=5.0)
-    conn.execute("PRAGMA journal_mode=WAL;")
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS extension_runtime (
-            ext_id TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            runtime TEXT DEFAULT 'python',
-            active_pid INTEGER DEFAULT 0,
-            status TEXT DEFAULT 'idle',
-            last_started INTEGER DEFAULT 0,
-            total_runs INTEGER DEFAULT 0,
-            total_duration_sec REAL DEFAULT 0.0,
-            permissions TEXT DEFAULT '[]',
-            metadata TEXT DEFAULT '{}',
-            updated_at INTEGER DEFAULT 0
-        );
-    """)
-    return conn
+    if sqlite3 is None:
+        return None
+    try:
+        p = get_db_path()
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        conn = sqlite3.connect(p, timeout=5.0)
+        conn.execute("PRAGMA journal_mode=WAL;")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS extension_runtime (
+                ext_id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                runtime TEXT DEFAULT 'python',
+                active_pid INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'idle',
+                last_started INTEGER DEFAULT 0,
+                total_runs INTEGER DEFAULT 0,
+                total_duration_sec REAL DEFAULT 0.0,
+                permissions TEXT DEFAULT '[]',
+                metadata TEXT DEFAULT '{}',
+                updated_at INTEGER DEFAULT 0
+            );
+        """)
+        return conn
+    except Exception:
+        return None
 
 def is_pid_alive(pid):
     if pid <= 0:
@@ -62,11 +97,19 @@ def cmd_list():
     os.makedirs(EXT_BASE, exist_ok=True)
     dirs = [d for d in os.listdir(EXT_BASE) if os.path.isdir(os.path.join(EXT_BASE, d))]
 
+    db_states = {}
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT ext_id, active_pid, status, total_runs FROM extension_runtime;")
-    db_states = {row[0]: {"pid": row[1], "status": row[2], "runs": row[3]} for row in cur.fetchall()}
-    conn.close()
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT ext_id, active_pid, status, total_runs FROM extension_runtime;")
+            db_states = {row[0]: {"pid": row[1], "status": row[2], "runs": row[3]} for row in cur.fetchall()}
+            conn.close()
+        except Exception:
+            pass
+    if not db_states:
+        json_data = load_json_state()
+        db_states = {k: {"pid": v.get("active_pid", 0), "status": v.get("status", "idle"), "runs": v.get("total_runs", 0)} for k, v in json_data.items()}
 
     print(f"{CLR_MAGENTA}{CLR_BOLD}🧩 VoidTerm Installed Extensions ({len(dirs)}){CLR_RESET}")
     print(f"{CLR_GRAY}───────────────────────────────────────────────────────────────────{CLR_RESET}")
@@ -179,16 +222,27 @@ def cmd_run(ext_id, extra_args):
 
     # Concurrency Gate
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT active_pid FROM extension_runtime WHERE ext_id = ?;", (ext_id,))
-    row = cur.fetchone()
-    if row and row[0] > 0 and singleton:
-        old_pid = row[0]
-        if is_pid_alive(old_pid):
-            conn.close()
-            print(f"{CLR_RED}{CLR_BOLD}[VoidExt] Blocked: Instance '{ext_id}' is already running with PID {old_pid}.{CLR_RESET}")
-            print(f"{CLR_YELLOW}Use 'void ext kill {ext_id}' or tap [KILL] in Extensions Hub to stop it.{CLR_RESET}")
-            return 126
+    old_pid = 0
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT active_pid FROM extension_runtime WHERE ext_id = ?;", (ext_id,))
+            row = cur.fetchone()
+            if row:
+                old_pid = row[0]
+        except Exception:
+            pass
+    if old_pid == 0:
+        j_state = load_json_state()
+        old_pid = j_state.get(ext_id, {}).get("active_pid", 0)
+
+    if old_pid > 0 and singleton and is_pid_alive(old_pid):
+        if conn:
+            try: conn.close()
+            except Exception: pass
+        print(f"{CLR_RED}{CLR_BOLD}[VoidExt] Blocked: Instance '{ext_id}' is already running with PID {old_pid}.{CLR_RESET}")
+        print(f"{CLR_YELLOW}Use 'void ext kill {ext_id}' or tap [KILL] in Extensions Hub to stop it.{CLR_RESET}")
+        return 126
 
     # Resolve interpreter
     if runtime in ("js", "javascript", "node") or entry.endswith(".js"):
@@ -203,20 +257,33 @@ def cmd_run(ext_id, extra_args):
     proc = subprocess.Popen(cmd)
     new_pid = proc.pid
 
-    # Record PID in NodeOS DB
+    # Record PID in NodeOS DB & JSON State
     now_ms = int(start_time * 1000)
-    cur.execute("""
-        INSERT INTO extension_runtime (ext_id, name, runtime, active_pid, status, last_started, total_runs, updated_at)
-        VALUES (?, ?, ?, ?, 'running', ?, 1, ?)
-        ON CONFLICT(ext_id) DO UPDATE SET
-            active_pid = excluded.active_pid,
-            status = 'running',
-            last_started = excluded.last_started,
-            total_runs = total_runs + 1,
-            updated_at = excluded.updated_at;
-    """, (ext_id, meta.get("name", ext_id), runtime, new_pid, now_ms, now_ms))
-    conn.commit()
-    conn.close()
+    if conn:
+        try:
+            cur.execute("""
+                INSERT INTO extension_runtime (ext_id, name, runtime, active_pid, status, last_started, total_runs, updated_at)
+                VALUES (?, ?, ?, ?, 'running', ?, 1, ?)
+                ON CONFLICT(ext_id) DO UPDATE SET
+                    active_pid = excluded.active_pid,
+                    status = 'running',
+                    last_started = excluded.last_started,
+                    total_runs = total_runs + 1,
+                    updated_at = excluded.updated_at;
+            """, (ext_id, meta.get("name", ext_id), runtime, new_pid, now_ms, now_ms))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    j_data = load_json_state()
+    ext_st = j_data.get(ext_id, {})
+    ext_st["active_pid"] = new_pid
+    ext_st["status"] = "running"
+    ext_st["total_runs"] = ext_st.get("total_runs", 0) + 1
+    ext_st["last_started"] = now_ms
+    j_data[ext_id] = ext_st
+    save_json_state(j_data)
 
     try:
         ret = proc.wait()
@@ -226,29 +293,52 @@ def cmd_run(ext_id, extra_args):
 
     duration = time.time() - start_time
 
-    # Cleanup DB state
+    # Cleanup DB & JSON state
     conn = get_db()
-    with conn:
-        conn.execute("""
-            UPDATE extension_runtime
-            SET active_pid = 0, status = 'idle', total_duration_sec = total_duration_sec + ?, updated_at = ?
-            WHERE ext_id = ?;
-        """, (duration, int(time.time() * 1000), ext_id))
-    conn.close()
+    if conn:
+        try:
+            with conn:
+                conn.execute("""
+                    UPDATE extension_runtime
+                    SET active_pid = 0, status = 'idle', total_duration_sec = total_duration_sec + ?, updated_at = ?
+                    WHERE ext_id = ?;
+                """, (duration, int(time.time() * 1000), ext_id))
+            conn.close()
+        except Exception:
+            pass
+
+    j_data = load_json_state()
+    if ext_id in j_data:
+        j_data[ext_id]["active_pid"] = 0
+        j_data[ext_id]["status"] = "idle"
+        j_data[ext_id]["total_duration_sec"] = j_data[ext_id].get("total_duration_sec", 0.0) + duration
+        save_json_state(j_data)
 
     return ret
 
 def cmd_kill(ext_id):
+    pid = 0
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT active_pid FROM extension_runtime WHERE ext_id = ?;", (ext_id,))
-    row = cur.fetchone()
-    if not row or row[0] <= 0:
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT active_pid FROM extension_runtime WHERE ext_id = ?;", (ext_id,))
+            row = cur.fetchone()
+            if row:
+                pid = row[0]
+        except Exception:
+            pass
+    if pid <= 0:
+        j_state = load_json_state()
+        pid = j_state.get(ext_id, {}).get("active_pid", 0)
+
+    if pid <= 0:
         print(f"{CLR_GRAY}Extension '{ext_id}' is not currently running.{CLR_RESET}")
-        conn.close()
+        if conn:
+            try: conn.close()
+            except Exception: pass
         return 0
 
-    pid = row[0]
     if is_pid_alive(pid):
         try:
             os.system(f"kill -9 -{pid} 2>/dev/null")
@@ -259,28 +349,59 @@ def cmd_kill(ext_id):
     else:
         print(f"{CLR_YELLOW}PID {pid} for extension '{ext_id}' had already terminated. Cleaned up state.{CLR_RESET}")
 
-    with conn:
-        conn.execute("UPDATE extension_runtime SET active_pid = 0, status = 'killed' WHERE ext_id = ?;", (ext_id,))
-    conn.close()
+    if conn:
+        try:
+            with conn:
+                conn.execute("UPDATE extension_runtime SET active_pid = 0, status = 'killed' WHERE ext_id = ?;", (ext_id,))
+            conn.close()
+        except Exception:
+            pass
+
+    j_data = load_json_state()
+    if ext_id in j_data:
+        j_data[ext_id]["active_pid"] = 0
+        j_data[ext_id]["status"] = "killed"
+        save_json_state(j_data)
+
     return 0
 
 def cmd_kill_all():
     conn = get_db()
-    cur = conn.cursor()
-    cur.execute("SELECT ext_id, active_pid FROM extension_runtime WHERE active_pid > 0;")
-    rows = cur.fetchall()
+    to_kill = []
+    if conn:
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT ext_id, active_pid FROM extension_runtime WHERE active_pid > 0;")
+            to_kill = cur.fetchall()
+        except Exception:
+            pass
+
+    if not to_kill:
+        j_state = load_json_state()
+        to_kill = [(k, v.get("active_pid", 0)) for k, v in j_state.items() if v.get("active_pid", 0) > 0]
 
     killed_count = 0
-    for ext_id, pid in rows:
+    for ext_id, pid in to_kill:
         if is_pid_alive(pid):
             os.system(f"kill -9 -{pid} 2>/dev/null")
             os.system(f"kill -9 {pid} 2>/dev/null")
             killed_count += 1
             print(f"{CLR_RED}⚡ Force killed '{ext_id}' (PID {pid}){CLR_RESET}")
 
-    with conn:
-        conn.execute("UPDATE extension_runtime SET active_pid = 0, status = 'killed' WHERE active_pid > 0;")
-    conn.close()
+    if conn:
+        try:
+            with conn:
+                conn.execute("UPDATE extension_runtime SET active_pid = 0, status = 'killed' WHERE active_pid > 0;")
+            conn.close()
+        except Exception:
+            pass
+
+    j_data = load_json_state()
+    for ext_id, _ in to_kill:
+        if ext_id in j_data:
+            j_data[ext_id]["active_pid"] = 0
+            j_data[ext_id]["status"] = "killed"
+    save_json_state(j_data)
 
     print(f"{CLR_GREEN}✔ Safety Breaker: Terminated {killed_count} active extension process(es).{CLR_RESET}")
     return 0
