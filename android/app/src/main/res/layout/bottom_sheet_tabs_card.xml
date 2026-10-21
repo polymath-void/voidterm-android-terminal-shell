@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0A0A0A">
+
+    <!-- Empty state when no tabs exist -->
+    <TextView
+        android:id="@+id/empty_tabs_message"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="No active tabs"
+        android:textColor="#6272A4"
+        android:textSize="16sp"
+        android:visibility="gone" />
+
+    <!-- Tabs grid container (populated programmatically) -->
+    <FrameLayout
+        android:id="@+id/tabs_grid_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#0A0A0A" />
+</FrameLayout>

@@ -28,6 +28,7 @@ class TerminalService : Service() {
 
     private var isEngineStarted = false
     private var wakeLock: PowerManager.WakeLock? = null
+    private var reloadTriggerObserver: FileObserver? = null
 
     inner class TerminalBinder : Binder() {
         val service: TerminalService
@@ -56,7 +57,31 @@ class TerminalService : Service() {
         voidFS = VoidFS(this)
         voidFS.setupFilesystem()
 
-        // 3. Initialize SessionManager and Broker
+        // 3. Setup FileObserver for hot-reload filesystem trigger (replaces insecure am broadcast)
+        val runDir = java.io.File(filesDir, "usr/var/run").apply { mkdirs() }
+        reloadTriggerObserver = object : android.os.FileObserver(runDir.absolutePath, CREATE or CLOSE_WRITE or MOVED_TO) {
+            private var lastReload = 0L
+            override fun onEvent(event: Int, path: String?) {
+                if (path == ".reload_trigger") {
+                    val now = System.currentTimeMillis()
+                    if (now - lastReload > 300) {
+                        lastReload = now
+                        Log.i(TAG, "Reload trigger detected (.reload_trigger). Hot-reloading DynamicCoreLoader.")
+                        DynamicCoreLoader.reload(this@TerminalService)
+                    }
+                }
+            }
+        }.apply { startWatching() }
+
+        // 4. Start Embedded OS API Gateway & Telemetry AlarmManager
+        try {
+            com.hybridengine.terminal.api.VoidApiServer.start(this)
+            com.hybridengine.terminal.telemetry.NodeOsTelemetrySync(this).setupAlarmManagerSync()
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice starting VoidApiServer / Telemetry: ${e.message}")
+        }
+
+        // 5. Initialize SessionManager and Broker
         sessionManager = SessionManager(this, voidFS)
         broker = Broker(this)
 
@@ -196,6 +221,12 @@ class TerminalService : Service() {
 
     fun shutdownEngine() {
         try {
+            reloadTriggerObserver?.stopWatching()
+            reloadTriggerObserver = null
+            com.hybridengine.terminal.api.VoidApiServer.stop()
+        } catch (_: Throwable) {}
+
+        try {
             if (::sessionManager.isInitialized) {
                 sessionManager.destroyAll()
             }
@@ -232,6 +263,12 @@ class TerminalService : Service() {
         } catch (e: Exception) {
             Log.w(TAG, "Error releasing wakeLock: ${e.message}")
         }
+
+        try {
+            reloadTriggerObserver?.stopWatching()
+            reloadTriggerObserver = null
+            com.hybridengine.terminal.api.VoidApiServer.stop()
+        } catch (_: Throwable) {}
 
         try {
             if (::sessionManager.isInitialized) {

@@ -198,6 +198,24 @@ class TerminalSurfaceView @JvmOverloads constructor(
         backgroundPaint.color = config.theme.background
         textPaint.color = config.theme.foreground
         textPaint.textSize = currentTextSize
+        val tf = try {
+            when (config.fontFamily.lowercase()) {
+                "jetbrainsmono", "jetbrains" -> {
+                    val fontFile = java.io.File(context.filesDir, "usr/share/fonts/JetBrainsMono-Regular.ttf")
+                    if (fontFile.exists()) Typeface.createFromFile(fontFile)
+                    else Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
+                }
+                "firacode", "fira" -> {
+                    val fontFile = java.io.File(context.filesDir, "usr/share/fonts/FiraCode-Regular.ttf")
+                    if (fontFile.exists()) Typeface.createFromFile(fontFile)
+                    else Typeface.create(Typeface.MONOSPACE, Typeface.NORMAL)
+                }
+                else -> Typeface.MONOSPACE
+            }
+        } catch (_: Exception) {
+            Typeface.MONOSPACE
+        }
+        textPaint.typeface = tf
         ansiParser.applyTheme(config.theme, currentTextSize)
         triggerRender()
     }
@@ -206,16 +224,21 @@ class TerminalSurfaceView @JvmOverloads constructor(
         applyConfig(TerminalConfig(context))
     }
 
-    fun updatePrompt(cwd: String, homeDir: String) {
+    fun updatePrompt(cwd: String, homeDir: String, username: String? = null) {
+        val user = username ?: try {
+            System.getProperty("user.name")?.takeIf { it.isNotBlank() && it != "root" && !it.startsWith("u0_") } ?: "piuu"
+        } catch (_: Exception) {
+            "piuu"
+        }
         val displayPath = when {
             cwd == homeDir -> "~"
             cwd.startsWith("$homeDir/") -> "~" + cwd.removePrefix(homeDir)
-            cwd == "/storage/emulated/0" -> "~/storage/shared"
-            cwd.startsWith("/storage/emulated/0/") -> "~/storage/shared" + cwd.removePrefix("/storage/emulated/0")
+            cwd == "/storage/emulated/0" -> "~/storage"
+            cwd.startsWith("/storage/emulated/0/") -> "~/storage" + cwd.removePrefix("/storage/emulated/0")
             else -> cwd
         }
         currentWorkingDirectory = displayPath
-        promptText = "voidterm:$displayPath$ "
+        promptText = "$user:$displayPath$ "
         triggerRender()
     }
 
@@ -599,6 +622,15 @@ class TerminalSurfaceView @JvmOverloads constructor(
         }
     }
 
+    fun deleteCharUnderCursor() {
+        val pos = cursorPosition.coerceIn(0, currentInputBuffer.length)
+        if (pos < currentInputBuffer.length) {
+            currentInputBuffer = currentInputBuffer.substring(0, pos) + currentInputBuffer.substring(pos + 1)
+            isUserScrolled = false
+            triggerRender()
+        }
+    }
+
     fun moveCursorLeft() {
         if (cursorPosition > 0) {
             cursorPosition--
@@ -791,8 +823,9 @@ class TerminalSurfaceView @JvmOverloads constructor(
         // 1. Draw solid background
         canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), backgroundPaint)
 
-        val paddingX = 24f
-        val paddingY = 24f
+        val density = resources.displayMetrics.density
+        val paddingX = (config.paddingHorizontalDp * density).coerceAtLeast(4f * density)
+        val paddingY = (config.paddingTopDp * density).coerceAtLeast(4f * density)
         val layoutWidth = (width - (paddingX * 2).toInt()).coerceAtLeast(100)
 
         // 2. Build styled Spannable buffer with ANSI formatting + Markdown highlighting
@@ -885,8 +918,9 @@ class TerminalSurfaceView @JvmOverloads constructor(
         }
 
         // Blinking cursor
+        val blinkRate = config.cursorBlinkRateMs.coerceIn(100L, 3000L)
         val isCursorVisible = if (config.cursorBlink) {
-            (System.currentTimeMillis() / 500) % 2 == 0L
+            (System.currentTimeMillis() / blinkRate) % 2 == 0L
         } else {
             true
         }

@@ -47,6 +47,18 @@
             android:background="?android:attr/selectableItemBackground"
             android:clickable="true"
             android:focusable="false" />
+
+        <!-- Extensions Hub Button (🧩) -->
+        <TextView
+            android:id="@+id/btn_extensions_hub"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:gravity="center"
+            android:text="🧩"
+            android:textSize="18sp"
+            android:background="?android:attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="false" />
     </LinearLayout>
 
     <!-- The Fullscreen Hardware Accelerated Terminal Surface with Native Inline Input -->
@@ -221,7 +233,7 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Floating Action Controls (Settings & Live Voice Mic) -->
+    <!-- Floating Action Controls (Settings only - mic button removed for privacy) -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -241,17 +253,6 @@
             app:tint="#F8F8F2"
             app:fabSize="mini"
             app:srcCompat="@drawable/ic_settings" />
-
-        <com.google.android.material.floatingactionbutton.FloatingActionButton
-            android:id="@+id/fab_voice"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:contentDescription="Live Voice Interaction"
-            app:backgroundTint="#6272A4"
-            app:tint="#50FA7B"
-            app:fabSize="mini"
-            app:srcCompat="@android:drawable/ic_btn_speak_now" />
     </LinearLayout>
 
     <!-- Keyboard Extra Keys Shortcut Toolbar (Double-row quick bar) -->

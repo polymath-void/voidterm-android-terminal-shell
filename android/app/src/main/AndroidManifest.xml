@@ -76,10 +76,18 @@
         </receiver>
 
         <receiver
-            android:name=".ReloadCoreReceiver"
-            android:exported="true">
+            android:name=".api.CronBroadcastReceiver"
+            android:exported="false">
             <intent-filter>
-                <action android:name="com.hybridengine.terminal.RELOAD_CORE" />
+                <action android:name="com.hybridengine.terminal.CRON_EXECUTE" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".telemetry.TelemetrySyncReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.hybridengine.terminal.SYNC_TELEMETRY" />
             </intent-filter>
         </receiver>
     </application>

@@ -18,7 +18,8 @@ class TabSession(
     var currentInput: String = "",
     var cursorPosition: Int = 0,
     var scrollOffset: Float = 0f,
-    var workingDir: String = "~"
+    var workingDir: String = "~",
+    var isPinned: Boolean = false
 )
 
 /**
@@ -46,9 +47,12 @@ class SessionManager(
         return sessions[safeIndex]
     }
 
-    fun createSession(initialTitle: String? = null): TabSession {
+    fun createSession(initialTitle: String? = null, initialWorkingDir: String? = null): TabSession {
         val id = nextSessionId++
         val title = initialTitle ?: "Tab $id"
+        val config = TerminalConfig(context)
+        val defaultDir = initialWorkingDir ?: config.defaultWorkingDir
+        val workDirFile = java.io.File(defaultDir).let { if (it.exists() && it.isDirectory) it else voidFS.homeDir }
 
         var tabRef: TabSession? = null
         val processSession = LocalProcessSession(context, voidFS) { output ->
@@ -70,12 +74,12 @@ class SessionManager(
             id = id,
             title = title,
             processSession = processSession,
-            workingDir = voidFS.homeDir.absolutePath
+            workingDir = workDirFile.absolutePath
         )
         tabRef = newTab
 
         sessions.add(newTab)
-        processSession.start()
+        processSession.start(workDirFile)
 
         val newIndex = sessions.size - 1
         activeIndex = newIndex
@@ -87,6 +91,24 @@ class SessionManager(
 
         Log.i(TAG, "Created new terminal session [ID: $id, Title: $title]. Total active: ${sessions.size}")
         return newTab
+    }
+
+    fun renameSession(index: Int, newTitle: String) {
+        if (index in sessions.indices && newTitle.isNotBlank()) {
+            sessions[index].title = newTitle.trim()
+            mainHandler.post {
+                onSessionsListChanged?.invoke()
+            }
+        }
+    }
+
+    fun togglePinSession(index: Int) {
+        if (index in sessions.indices) {
+            sessions[index].isPinned = !sessions[index].isPinned
+            mainHandler.post {
+                onSessionsListChanged?.invoke()
+            }
+        }
     }
 
     fun switchToSession(index: Int) {
@@ -114,6 +136,10 @@ class SessionManager(
         if (index !in sessions.indices) return
 
         val sessionToClose = sessions[index]
+        if (sessionToClose.isPinned) {
+            Log.w(TAG, "Cannot close pinned tab [Index: $index, ID: ${sessionToClose.id}]")
+            return
+        }
         Log.i(TAG, "Closing terminal session [Index: $index, ID: ${sessionToClose.id}]")
         sessionToClose.processSession.destroy()
         sessions.removeAt(index)

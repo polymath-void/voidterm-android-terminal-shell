@@ -54,7 +54,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var textHudFile: TextView
     private lateinit var progressHud: ProgressBar
     private lateinit var btnHudDismiss: ImageView
-    private lateinit var fabVoice: com.google.android.material.floatingactionbutton.FloatingActionButton
+    private var fabVoice: com.google.android.material.floatingactionbutton.FloatingActionButton? = null
     private lateinit var voiceManager: VoiceManager
     private val hudDismissHandler = Handler(Looper.getMainLooper())
     private var hudDismissRunnable: Runnable? = null
@@ -190,7 +190,8 @@ class MainActivity : AppCompatActivity() {
         textHudFile = findViewById(R.id.text_hud_file)
         progressHud = findViewById(R.id.progress_hud)
         btnHudDismiss = findViewById(R.id.btn_hud_dismiss)
-        fabVoice = findViewById(R.id.fab_voice)
+        // Mic button removed from dashboard, keeping permission operable for background pkgs/extensions
+        fabVoice = null
 
         btnHudDismiss.setOnClickListener {
             cardAgentHud.visibility = View.GONE
@@ -199,6 +200,26 @@ class MainActivity : AppCompatActivity() {
         btnAddTab.setOnClickListener {
             it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
             terminalService?.sessionManager?.createSession()
+        }
+
+        findViewById<View>(R.id.btn_extensions_hub)?.setOnClickListener {
+            it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            com.hybridengine.terminal.sheets.ExtensionsHubBottomSheet().show(
+                supportFragmentManager,
+                com.hybridengine.terminal.sheets.ExtensionsHubBottomSheet.TAG
+            )
+        }
+
+        // Initialize and register installed polyglot extensions
+        com.hybridengine.terminal.extensions.ExtensionManager.initExtensions(this)
+
+        // ⊞ (Grid Icon) - Open Tab Card Bottom Sheet / Overview
+        btnAddTab.setOnLongClickListener {
+            it.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            terminalService?.sessionManager?.let { sm ->
+                TabsCardBottomSheet().show(supportFragmentManager, sm)
+            }
+            true
         }
 
         setupKeyboardToolbar()
@@ -214,7 +235,7 @@ class MainActivity : AppCompatActivity() {
             onListeningStateChanged = { listening ->
                 runOnUiThread {
                     if (listening) {
-                        fabVoice.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#FF5555"))
+                        fabVoice?.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#FF5555"))
                         updateAgentHud(
                             HudTelemetry(
                                 agent = "Voice Agent",
@@ -223,7 +244,7 @@ class MainActivity : AppCompatActivity() {
                             )
                         )
                     } else {
-                        fabVoice.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#6272A4"))
+                        fabVoice?.backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#6272A4"))
                     }
                 }
             }
@@ -266,7 +287,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        fabVoice.setOnClickListener {
+        fabVoice?.setOnClickListener {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.RECORD_AUDIO), 102)
             } else {
@@ -286,6 +307,23 @@ class MainActivity : AppCompatActivity() {
                 val sm = terminalService?.sessionManager
                 val activeTab = sm?.getActiveSession()
                 if (activeTab != null) {
+                    if (trimmed.startsWith("/")) {
+                        if (trimmed == "/hub" || trimmed == "/ext") {
+                            runOnUiThread {
+                                com.hybridengine.terminal.sheets.ExtensionsHubBottomSheet().show(
+                                    supportFragmentManager,
+                                    com.hybridengine.terminal.sheets.ExtensionsHubBottomSheet.TAG
+                                )
+                            }
+                            return@onCommandSubmitted
+                        }
+                        val slashHandled = com.hybridengine.terminal.extensions.ExtensionManager.executeSlashCommand(
+                            this@MainActivity,
+                            activeTab,
+                            trimmed
+                        )
+                        if (slashHandled) return@onCommandSubmitted
+                    }
                     activeTab.processSession.write(trimmed)
                     // Update working directory and prompt after command execution
                     terminalSurface.postDelayed({
@@ -356,11 +394,47 @@ class MainActivity : AppCompatActivity() {
                     }
                     sm.switchToSession(index)
                 }
+
+                // Long press on tab: Pin/Unpin or Rename dialog
+                setOnLongClickListener {
+                    performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                    val options = arrayOf(
+                        if (tab.isPinned) "Unpin Tab" else "Pin Tab",
+                        "Rename Tab"
+                    )
+                    android.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle(tab.title)
+                        .setItems(options) { _, which ->
+                            when (which) {
+                                0 -> sm.togglePinSession(index)
+                                1 -> {
+                                    val input = android.widget.EditText(this@MainActivity).apply {
+                                        setText(tab.title)
+                                        selectAll()
+                                    }
+                                    android.app.AlertDialog.Builder(this@MainActivity)
+                                        .setTitle("Rename Tab")
+                                        .setView(input)
+                                        .setPositiveButton("Save") { _, _ ->
+                                            val newName = input.text.toString().trim()
+                                            if (newName.isNotEmpty()) {
+                                                sm.renameSession(index, newName)
+                                            }
+                                        }
+                                        .setNegativeButton("Cancel", null)
+                                        .show()
+                                }
+                            }
+                        }
+                        .show()
+                    true
+                }
             }
 
-            // Tab Title Label
+            // Tab Title Label (with pin indicator)
             val textTitle = TextView(this).apply {
-                text = tab.title
+                val pinBadge = if (tab.isPinned) "📌 " else ""
+                text = "$pinBadge${tab.title}"
                 textSize = 12f
                 typeface = Typeface.MONOSPACE
                 setTextColor(if (isActive) Color.parseColor("#50FA7B") else Color.parseColor("#F8F8F2"))
@@ -369,8 +443,8 @@ class MainActivity : AppCompatActivity() {
             }
             tabLayout.addView(textTitle)
 
-            // Close Tab Button (✕) if more than 1 tab
-            if (sm.sessions.size > 1) {
+            // Close Tab Button (✕) if more than 1 tab and not pinned
+            if (sm.sessions.size > 1 && !tab.isPinned) {
                 val btnClose = TextView(this).apply {
                     text = "  ✕"
                     textSize = 11f
@@ -394,6 +468,8 @@ class MainActivity : AppCompatActivity() {
     private fun setupKeyboardToolbar() {
         val row1Layout = findViewById<LinearLayout>(R.id.layout_keyboard_keys_row1) ?: return
         val row2Layout = findViewById<LinearLayout>(R.id.layout_keyboard_keys_row2) ?: return
+        row1Layout.removeAllViews()
+        row2Layout.removeAllViews()
 
         data class KeyDef(
             val label: String,
@@ -403,87 +479,93 @@ class MainActivity : AppCompatActivity() {
             val keyType: String = "normal"
         )
 
-        // Row 1: Actions, Modifiers & Clipboard
-        val row1Keys = listOf(
+        // Row 1 Base (8 keys): System, Modifiers, and UP arrow on the right
+        val row1Base = listOf(
             KeyDef("ESC", { terminalSurface.insertText("\u001b") }, isActionKey = true),
             KeyDef("TAB", { terminalSurface.handleTabCompletion() }, isAccentKey = true),
             KeyDef("CTRL", {
                 terminalSurface.isCtrlActive = !terminalSurface.isCtrlActive
+                updateModifierButtonState(btnCtrl, terminalSurface.isCtrlActive, "#FF5555")
             }, keyType = "ctrl"),
             KeyDef("ALT", {
                 terminalSurface.isAltActive = !terminalSurface.isAltActive
+                updateModifierButtonState(btnAlt, terminalSurface.isAltActive, "#F1FA8C")
             }, keyType = "alt"),
-            KeyDef("SHIFT", {
-                terminalSurface.isShiftActive = !terminalSurface.isShiftActive
-            }, keyType = "shift"),
-            KeyDef("HOME", { terminalSurface.setCursorToStart() }, isAccentKey = true),
-            KeyDef("END", { terminalSurface.setCursorToEnd() }, isAccentKey = true),
             KeyDef("BKSP", { terminalSurface.deleteLastChar() }),
-            KeyDef("COPY", {
-                val selected = terminalSurface.getSelectedText()
-                val textToCopy = if (!selected.isNullOrEmpty()) {
-                    terminalSurface.clearSelection()
-                    cardSelectionBar?.visibility = View.GONE
-                    selected
-                } else {
-                    terminalSurface.copyAllText()
-                }
-                if (textToCopy.isNotEmpty()) {
-                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val clip = ClipData.newPlainText("VoidTerm", textToCopy)
-                    clipboard.setPrimaryClip(clip)
-                    val msg = if (!selected.isNullOrEmpty()) "Selection copied" else "Terminal output copied"
-                    Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
-                }
-            }, isAccentKey = true),
-            KeyDef("PASTE", {
-                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                if (clipboard.hasPrimaryClip()) {
-                    val item = clipboard.primaryClip?.getItemAt(0)
-                    val text = item?.text?.toString()
-                    if (!text.isNullOrEmpty()) {
-                        terminalSurface.insertText(text)
-                    }
-                }
-            }, isAccentKey = true),
-            KeyDef("CLR", { terminalSurface.clearScreen() }, isActionKey = true)
+            KeyDef("HOME", { terminalSurface.setCursorToStart() }, isAccentKey = true),
+            KeyDef("▲", { terminalSurface.handleHistoryUp() }, isActionKey = true, keyType = "arrow"),
+            KeyDef("END", { terminalSurface.setCursorToEnd() }, isAccentKey = true)
         )
 
-        // Row 2: Navigation & Common Unix Symbols
-        val row2Keys = listOf(
-            KeyDef("↑", { terminalSurface.handleHistoryUp() }, isAccentKey = true),
-            KeyDef("↓", { terminalSurface.handleHistoryDown() }, isAccentKey = true),
-            KeyDef("←", { terminalSurface.moveCursorLeft() }),
-            KeyDef("→", { terminalSurface.moveCursorRight() }),
+        val row1Extended = listOf(
+            KeyDef("SHIFT", {
+                terminalSurface.isShiftActive = !terminalSurface.isShiftActive
+                updateModifierButtonState(btnShift, terminalSurface.isShiftActive, "#BD93F9")
+            }, keyType = "shift"),
+            KeyDef("COPY", { copySelectionToClipboard() }, isAccentKey = true),
+            KeyDef("CLR", { terminalSurface.clearScreen() }, isActionKey = true),
+            KeyDef("F1", { terminalSurface.insertText("\u001bOP") }),
+            KeyDef("F2", { terminalSurface.insertText("\u001bOQ") }),
+            KeyDef("F3", { terminalSurface.insertText("\u001bOR") }),
+            KeyDef("F4", { terminalSurface.insertText("\u001bOS") }),
+            KeyDef("F5", { terminalSurface.insertText("\u001b[15~") }),
+            KeyDef("F12", { terminalSurface.insertText("\u001b[24~") })
+        )
+
+        // Row 2 Base (8 keys): Symbols, Paste, and Inverted-T [◀, ▼, ▶] on the right directly below ▲
+        val row2Base = listOf(
+            KeyDef("~", { terminalSurface.insertText("~") }),
             KeyDef("/", { terminalSurface.insertText("/") }),
             KeyDef("-", { terminalSurface.insertText("-") }),
-            KeyDef("_", { terminalSurface.insertText("_") }),
-            KeyDef("~", { terminalSurface.insertText("~") }),
             KeyDef("|", { terminalSurface.insertText("|") }),
+            KeyDef("PASTE", { pasteFromClipboard() }, isAccentKey = true),
+            KeyDef("◀", { terminalSurface.moveCursorLeft() }, keyType = "arrow"),
+            KeyDef("▼", { terminalSurface.handleHistoryDown() }, isActionKey = true, keyType = "arrow"),
+            KeyDef("▶", { terminalSurface.moveCursorRight() }, keyType = "arrow")
+        )
+
+        val row2Extended = listOf(
             KeyDef("$", { terminalSurface.insertText("$") }),
             KeyDef("\"", { terminalSurface.insertText("\"") }),
             KeyDef("'", { terminalSurface.insertText("'") }),
             KeyDef(":", { terminalSurface.insertText(":") }),
             KeyDef(";", { terminalSurface.insertText(";") }),
             KeyDef("&", { terminalSurface.insertText("&") }),
-            KeyDef("?", { terminalSurface.insertText("?") })
+            KeyDef("?", { terminalSurface.insertText("?") }),
+            KeyDef("_", { terminalSurface.insertText("_") }),
+            KeyDef("=", { terminalSurface.insertText("=") }),
+            KeyDef("\\", { terminalSurface.insertText("\\") }),
+            KeyDef("(", { terminalSurface.insertText("(") }),
+            KeyDef(")", { terminalSurface.insertText(")") })
         )
 
         val density = resources.displayMetrics.density
         val minWidthPx = (36 * density).toInt()
         val heightPx = (30 * density).toInt()
         val marginPx = (2 * density).toInt()
-        val paddingHorizontalPx = (7 * density).toInt()
+        val paddingHorizontalPx = (6 * density).toInt()
 
-        fun createKeyButton(key: KeyDef): TextView {
+        val config = TerminalConfig(this)
+        val row1Limit = config.row1Limit
+        val row2Limit = config.row2Limit
+        val row1Unlocked = config.row1Unlocked
+        val row2Unlocked = config.row2Unlocked
+
+        val availableWidth = (resources.displayMetrics.widthPixels - (16 * density).toInt())
+        val row1EffectiveWidth = if (row1Unlocked) minWidthPx else kotlin.math.max(minWidthPx, (availableWidth - (marginPx * 2 * row1Limit)) / kotlin.math.max(1, row1Limit))
+        val row2EffectiveWidth = if (row2Unlocked) minWidthPx else kotlin.math.max(minWidthPx, (availableWidth - (marginPx * 2 * row2Limit)) / kotlin.math.max(1, row2Limit))
+
+        fun createKeyButton(key: KeyDef, isRow1: Boolean): TextView {
+            val isUnlocked = if (isRow1) row1Unlocked else row2Unlocked
+            val effectiveWidth = if (isRow1) row1EffectiveWidth else row2EffectiveWidth
+
             val btn = TextView(this).apply {
                 text = key.label
                 textSize = 12f
                 typeface = Typeface.MONOSPACE
                 gravity = Gravity.CENTER
-                minWidth = minWidthPx
-                minimumWidth = minWidthPx
-                height = heightPx
+                minWidth = if (isUnlocked) minWidthPx else effectiveWidth
+                minimumWidth = if (isUnlocked) minWidthPx else effectiveWidth
                 setPadding(paddingHorizontalPx, 0, paddingHorizontalPx, 0)
                 isClickable = true
                 isFocusable = false
@@ -503,10 +585,8 @@ class MainActivity : AppCompatActivity() {
                     setStroke((1 * density).toInt(), Color.parseColor("#44475A"))
                 }
 
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    heightPx
-                ).apply {
+                val keyWidth = if (isUnlocked) minWidthPx else effectiveWidth
+                layoutParams = LinearLayout.LayoutParams(keyWidth, heightPx).apply {
                     setMargins(marginPx, 0, marginPx, 0)
                 }
 
@@ -525,17 +605,126 @@ class MainActivity : AppCompatActivity() {
             return btn
         }
 
-        row1Keys.forEach { row1Layout.addView(createKeyButton(it)) }
-        row2Keys.forEach { row2Layout.addView(createKeyButton(it)) }
+        // Apply row1 keys
+        val finalRow1Keys = if (row1Unlocked) row1Base + row1Extended else row1Base.take(row1Limit)
+        finalRow1Keys.forEach { key ->
+            row1Layout.addView(createKeyButton(key, isRow1 = true))
+        }
 
-        // Modifier state listener to dynamically update button colors
-        terminalSurface.onModifierStateChanged = {
-            runOnUiThread {
-                updateModifierButtonState(btnCtrl, terminalSurface.isCtrlActive, "#50FA7B")
-                updateModifierButtonState(btnAlt, terminalSurface.isAltActive, "#FFB86C")
-                updateModifierButtonState(btnShift, terminalSurface.isShiftActive, "#BD93F9")
+        // Apply row2 keys
+        val finalRow2Keys = if (row2Unlocked) row2Base + row2Extended else row2Base.take(row2Limit)
+        finalRow2Keys.forEach { key ->
+            row2Layout.addView(createKeyButton(key, isRow1 = false))
+        }
+
+        val scrollRow1 = findViewById<android.widget.HorizontalScrollView>(R.id.keyboard_toolbar_row1)
+        val scrollRow2 = findViewById<android.widget.HorizontalScrollView>(R.id.keyboard_toolbar_row2)
+        scrollRow1?.isFillViewport = !row1Unlocked
+        scrollRow2?.isFillViewport = !row2Unlocked
+    }
+
+    private fun copySelectionToClipboard() {
+        val selected = terminalSurface.getSelectedText()
+        val textToCopy = if (!selected.isNullOrEmpty()) {
+            terminalSurface.clearSelection()
+            cardSelectionBar?.visibility = View.GONE
+            selected
+        } else {
+            terminalSurface.copyAllText()
+        }
+        if (textToCopy.isNotEmpty()) {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("VoidTerm", textToCopy)
+            clipboard.setPrimaryClip(clip)
+            val msg = if (!selected.isNullOrEmpty()) "Selection copied" else "Terminal output copied"
+            Toast.makeText(this@MainActivity, msg, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun pasteFromClipboard() {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        if (clipboard.hasPrimaryClip()) {
+            val item = clipboard.primaryClip?.getItemAt(0)
+            val text = item?.text?.toString()
+            if (!text.isNullOrEmpty()) {
+                terminalSurface.insertText(text)
             }
         }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            val isCtrl = event.isCtrlPressed || terminalSurface.isCtrlActive
+            val isShift = event.isShiftPressed || terminalSurface.isShiftActive
+            val sm = terminalService?.sessionManager
+
+            if (isCtrl) {
+                when (event.keyCode) {
+                    KeyEvent.KEYCODE_C -> {
+                        if (isShift) {
+                            copySelectionToClipboard()
+                        } else {
+                            terminalSurface.handleCtrlC()
+                            sm?.getActiveSession()?.processSession?.sendSignalSigInt()
+                        }
+                        terminalSurface.isCtrlActive = false
+                        terminalSurface.isShiftActive = false
+                        return true
+                    }
+                    KeyEvent.KEYCODE_V -> {
+                        pasteFromClipboard()
+                        terminalSurface.isCtrlActive = false
+                        return true
+                    }
+                    KeyEvent.KEYCODE_T -> {
+                        sm?.createSession()
+                        terminalSurface.isCtrlActive = false
+                        return true
+                    }
+                    KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_PAGE_UP -> {
+                        sm?.let {
+                            if (it.sessions.size > 1) {
+                                val prev = (it.activeIndex - 1 + it.sessions.size) % it.sessions.size
+                                it.switchToSession(prev)
+                            }
+                        }
+                        terminalSurface.isCtrlActive = false
+                        return true
+                    }
+                    KeyEvent.KEYCODE_2, KeyEvent.KEYCODE_PAGE_DOWN -> {
+                        sm?.let {
+                            if (it.sessions.size > 1) {
+                                val next = (it.activeIndex + 1) % it.sessions.size
+                                it.switchToSession(next)
+                            }
+                        }
+                        terminalSurface.isCtrlActive = false
+                        return true
+                    }
+                    KeyEvent.KEYCODE_D -> {
+                        val active = sm?.getActiveSession()
+                        if (terminalSurface.currentInputBuffer.isEmpty()) {
+                            active?.processSession?.write("\u0004")
+                        } else {
+                            terminalSurface.deleteCharUnderCursor()
+                        }
+                        terminalSurface.isCtrlActive = false
+                        return true
+                    }
+                    KeyEvent.KEYCODE_L -> {
+                        terminalSurface.clearScreen()
+                        terminalSurface.isCtrlActive = false
+                        return true
+                    }
+                    KeyEvent.KEYCODE_Z -> {
+                        sm?.getActiveSession()?.processSession?.write("\u001a")
+                        terminalSurface.isCtrlActive = false
+                        return true
+                    }
+                }
+            }
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     private fun updateModifierButtonState(button: TextView?, isActive: Boolean, activeColorHex: String) {

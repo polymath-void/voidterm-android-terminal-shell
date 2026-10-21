@@ -36,11 +36,26 @@ object DynamicCoreLoader {
         val configFile = File(usrEtc, "voidterm.json")
         if (!configFile.exists()) {
             val defaultConfig = JSONObject().apply {
+                put("_guide", "VoidTerm Sovereign Configuration Guide: Adjust visual styling, keyboard layout, and POSIX defaults here.")
                 put("theme", "DRACULA")
+                put("_theme_options", "DRACULA, NORD, GRUVBOX, TOKYO_NIGHT, CYBERPUNK, MATERIAL_DARK, SOLARIZED_DARK, ONE_DARK, MONOKAI_PRO, MATRIX_GREEN")
                 put("font_size", 34.0)
+                put("font_family", "JetBrainsMono")
+                put("_font_options", "JetBrainsMono, FiraCode, Monospace")
+                put("padding_top_dp", 8)
+                put("padding_bottom_dp", 8)
+                put("padding_horizontal_dp", 12)
                 put("cursor_style", "BLOCK")
+                put("_cursor_style_options", "BLOCK, UNDERLINE, BAR")
+                put("cursor_blink", true)
+                put("cursor_blink_rate_ms", 500)
                 put("default_shell", "/system/bin/sh")
-                put("motd", "Welcome to VoidTerm Instant Runtime Container.")
+                put("default_working_dir", "\$HOME")
+                put("row1_limit", 8)
+                put("row2_limit", 8)
+                put("row1_unlocked", false)
+                put("row2_unlocked", false)
+                put("motd", "Welcome to VoidTerm Sovereign Architecture.")
             }
             try {
                 FileOutputStream(configFile).use {
@@ -50,6 +65,88 @@ object DynamicCoreLoader {
             } catch (e: Exception) {
                 Log.e(TAG, "Error creating voidterm.json: ${e.message}")
             }
+        }
+
+        // Deploy configuration markdown comments guide
+        val guideFile = File(usrEtc, "voidterm.json.guide.md")
+        if (!guideFile.exists()) {
+            deployFile(
+                guideFile,
+                """
+                # VoidTerm Visual & System Configuration Guide
+                
+                This guide describes all customization properties supported in `voidterm.json`:
+                
+                ## Visual & Terminal Surface
+                - `theme`: Active color theme preset. Options:
+                  - `DRACULA` (Dracula vibrant dark)
+                  - `NORD` (Nord Arctic blue palette)
+                  - `GRUVBOX` (Retro groove earthy tones)
+                  - `TOKYO_NIGHT` (Clean modern indigo)
+                  - `CYBERPUNK` (Neon yellow & cyan high-contrast)
+                  - `MATERIAL_DARK` (Standard Android dark palette)
+                  - `SOLARIZED_DARK` (Low-contrast solarized dark)
+                  - `ONE_DARK` (Atom One Dark syntax palette)
+                  - `MONOKAI_PRO` (Monokai Pro developer palette)
+                  - `MATRIX_GREEN` (Terminal phosphor green)
+                - `font_size`: Terminal font size in points (e.g. 28.0 to 44.0).
+                - `font_family`: Font asset name (`JetBrainsMono`, `FiraCode`, `Monospace`).
+                - `padding_top_dp`, `padding_bottom_dp`, `padding_horizontal_dp`: Adjusts terminal canvas spacing.
+                - `cursor_style`: Cursor glyph shape (`BLOCK`, `UNDERLINE`, `BAR`).
+                - `cursor_blink`: Boolean toggle for cursor blinking animation.
+                - `cursor_blink_rate_ms`: Cursor blink interval in milliseconds (default: 500ms).
+                
+                ## Shell & Workspace
+                - `default_shell`: Absolute path to initial shell binary (default: `/system/bin/sh` or `$PREFIX/bin/bash`).
+                - `default_working_dir`: Directory to open on app startup and in new tabs (e.g. `$HOME` or `~/Projects`).
+                
+                ## Keyboard Shortcuts & Row Budgeting
+                - `row1_limit`, `row2_limit`: Number of keys visible per row before horizontal scroll (default: 8).
+                - `row1_unlocked`, `row2_unlocked`: Set to `true` to enable smooth horizontal swipe scrolling for extra keys.
+                
+                ## MOTD & Welcome Banner
+                - Configured in `$PREFIX/etc/motd.json`. Adjust `banner_title`, `welcome_message`, and `quick_hints`.
+                """.trimIndent()
+            )
+        }
+
+        // Deploy default motd.json
+        val motdFile = File(usrEtc, "motd.json")
+        if (!motdFile.exists()) {
+            val defaultMotd = JSONObject().apply {
+                put("show_motd", true)
+                put("banner_title", "VoidCore Dynamic POSIX Shell [AArch64]")
+                put("welcome_message", "Welcome to VoidTerm Sovereign Architecture")
+                put("show_device_info", true)
+                put("show_quick_hints", true)
+                val hints = org.json.JSONArray().apply {
+                    put("Type '/pkg' to open interactive package manager")
+                    put("Type '/file' to launch visual VFS file browser")
+                    put("Type '/hub' or tap 🧩 to open Extensions Hub")
+                    put("Type 'void status' to inspect container state")
+                }
+                put("quick_hints", hints)
+                put("default_working_dir", "\$HOME")
+            }
+            try {
+                FileOutputStream(motdFile).use {
+                    it.write(defaultMotd.toString(2).toByteArray(Charsets.UTF_8))
+                }
+            } catch (_: Exception) {}
+        }
+
+        // Ensure home storage shortcuts exist ($HOME/storage and $HOME/sdcard -> /sdcard)
+        val homeStorage = File(homeDir, "storage")
+        if (!homeStorage.exists()) {
+            try {
+                android.system.Os.symlink("/sdcard", homeStorage.absolutePath)
+            } catch (_: Exception) {}
+        }
+        val homeSdcard = File(homeDir, "sdcard")
+        if (!homeSdcard.exists()) {
+            try {
+                android.system.Os.symlink("/sdcard", homeSdcard.absolutePath)
+            } catch (_: Exception) {}
         }
 
         // 2. Deploy DNS Resolver (resolv.conf) & Local Hosts (hosts)
@@ -97,9 +194,16 @@ object DynamicCoreLoader {
                 shift
                 "${'$'}SELF_DIR/pkg" "${'$'}@"
                 ;;
+              "ext")
+                shift
+                exec "${'$'}SELF_DIR/void-ext" "${'$'}@"
+                ;;
               "reload")
-                echo "\033[35m[VoidTerm]\033[0m Broadcasting RELOAD_CORE intent..."
-                am broadcast -a com.hybridengine.terminal.RELOAD_CORE
+                # Write filesystem trigger file instead of insecure broadcast intent
+                TRIGGER_FILE="${'$'}PREFIX/var/run/.reload_trigger"
+                mkdir -p "${'$'}(dirname "${'$'}TRIGGER_FILE")"
+                touch "${'$'}TRIGGER_FILE"
+                echo "\033[35m[VoidTerm]\033[0m Reload trigger written to filesystem."
                 ;;
               "status")
                 echo "\033[36m================================================\033[0m"
@@ -259,7 +363,82 @@ object DynamicCoreLoader {
             """
             #!/system/bin/sh
             echo "\033[35m[VoidTerm]\033[0m Reloading runtime..."
-            am broadcast -a com.hybridengine.terminal.RELOAD_CORE
+            TRIGGER_FILE="${'$'}PREFIX/var/run/.reload_trigger"
+            mkdir -p "${'$'}(dirname "${'$'}TRIGGER_FILE")"
+            touch "${'$'}TRIGGER_FILE"
+            """.trimIndent()
+        )
+
+        // VoidOS API Gateway CLI wrappers
+        deployScript(
+            File(usrBin, "void-clipboard"),
+            """
+            #!/system/bin/sh
+            # VoidTerm Clipboard CLI Wrapper
+            exec "${'$'}PREFIX/bin/voidpkg.py" clipboard.set "$@"
+            """.trimIndent()
+        )
+
+        deployScript(
+            File(usrBin, "void-toast"),
+            """
+            #!/system/bin/sh
+            # VoidTerm Toast CLI Wrapper
+            exec "${'$'}PREFIX/bin/voidpkg.py" toast.set "$@"
+            """.trimIndent()
+        )
+
+        deployScript(
+            File(usrBin, "void-notify"),
+            """
+            #!/system/bin/sh
+            # VoidTerm Notification CLI Wrapper
+            exec "${'$'}PREFIX/bin/voidpkg.py" notification.post "$@"
+            """.trimIndent()
+        )
+
+        deployScript(
+            File(usrBin, "void-vibrate"),
+            """
+            #!/system/bin/sh
+            # VoidTerm Vibrate CLI Wrapper
+            exec "${'$'}PREFIX/bin/voidpkg.py" vibrator.vibrate "$@"
+            """.trimIndent()
+        )
+
+        deployScript(
+            File(usrBin, "void-battery"),
+            """
+            #!/system/bin/sh
+            # VoidTerm Battery Status CLI Wrapper
+            exec "${'$'}PREFIX/bin/voidpkg.py" battery.status "$@"
+            """.trimIndent()
+        )
+
+        deployScript(
+            File(usrBin, "void-wakelock"),
+            """
+            #!/system/bin/sh
+            # VoidTerm WakeLock CLI Wrapper
+            exec "${'$'}PREFIX/bin/voidpkg.py" power.wakelock_acquire "$@"
+            """.trimIndent()
+        )
+
+        deployScript(
+            File(usrBin, "void-intent"),
+            """
+            #!/system/bin/sh
+            # VoidTerm Intent Launcher CLI Wrapper
+            exec "${'$'}PREFIX/bin/voidpkg.py" intent.launch "$@"
+            """.trimIndent()
+        )
+
+        // Visual directory listing applet
+        deployScript(
+            File(usrBin, "voidls"),
+            """
+            #!/system/bin/sh
+            python3 "${'$'}PREFIX/bin/voidls.py" "$@"
             """.trimIndent()
         )
 
@@ -282,49 +461,100 @@ object DynamicCoreLoader {
             File(usrBin, "voidfs"),
             """
             #!/system/bin/sh
-            echo "\033[36m=== VoidFS Rootless POSIX Architecture ===\033[0m"
-            echo "Type: Rootless Termux-compatible FHS"
+            echo "\033[36m=== VoidFS Sovereign Rootless Architecture ===\033[0m"
+            echo "Type: Sovereign Rootless POSIX Container Architecture (VoidFS)"
             echo "Prefix: ${'$'}PREFIX"
             echo "Home: ${'$'}HOME"
-            echo "Storage Bridge: ${'$'}HOME/storage/shared -> /sdcard"
+            echo "Storage Bridge: ${'$'}HOME/storage -> /sdcard"
             echo "Active FHS Dirs:"
             ls -ld ${'$'}PREFIX/bin ${'$'}PREFIX/etc ${'$'}PREFIX/tmp ${'$'}HOME
             """.trimIndent()
         )
 
-        // 5. Deploy default .bashrc in home if not present
+        // 5. Deploy default .bashrc in home
         val bashrc = File(homeDir, ".bashrc")
-        if (!bashrc.exists()) {
-            deployScript(
-                bashrc,
-                """
-                export PREFIX="/data/user/0/com.hybridengine.terminal/files/usr"
-                export HOME="/data/user/0/com.hybridengine.terminal/files/home"
-                export TMPDIR="${'$'}PREFIX/tmp"
-                export LD_LIBRARY_PATH="${'$'}PREFIX/lib"
-                export PATH="${'$'}PREFIX/bin:/system/bin:/system/xbin"
-                export TERM="xterm-256color"
-                export PS1="voidterm:\w$ "
+        deployScript(
+            bashrc,
+            """
+            export PREFIX="${'$'}(cd "${'$'}SELF_DIR/.." && pwd)"
+            export HOME="${'$'}HOME"
+            export TMPDIR="${'$'}PREFIX/tmp"
+            export LD_LIBRARY_PATH="${'$'}PREFIX/lib"
+            export PATH="${'$'}PREFIX/bin:/system/bin:/system/xbin"
+            export TERM="xterm-256color"
 
-                alias ll="ls -la"
-                alias l="ls -CF"
-                alias pkg="${'$'}PREFIX/bin/pkg"
-                alias void="${'$'}PREFIX/bin/void"
-                alias voidfs="${'$'}PREFIX/bin/voidfs"
-                alias help="${'$'}PREFIX/bin/help"
-                alias reload="${'$'}PREFIX/bin/reload"
-                alias cls="clear"
-                alias ipconfig="${'$'}PREFIX/bin/ipconfig"
+            # Dynamic prompt function: username in green, colon in white, directory in cyan, $ in yellow
+            __void_prompt() {
+                _u="${'$'}{USER:-${'$'}(whoami 2>/dev/null || echo voidterm)}"
+                _d="${'$'}PWD"
+                case "${'$'}_d" in
+                    "${'$'}HOME") _d="~" ;;
+                    "${'$'}HOME"/*) _d="~${'$'}{_d#${'$'}HOME}" ;;
+                esac
+                printf "\033[1;32m%s\033[0m:\033[1;36m%s\033[0m\033[1;33m$\033[0m " "${'$'}_u" "${'$'}_d"
+            }
+            export PS1='${'$'}(__void_prompt)'
 
-                echo "\033[36m========================================\033[0m"
-                echo "\033[32m✔ VoidTerm Rootless Container v1.0.0\033[0m"
-                echo "  Prefix: ${'$'}PREFIX"
-                echo "  Packages: ${'$'}(ls ${'$'}PREFIX/bin 2>/dev/null | wc -l) binaries active"
-                echo "  Type 'help' or 'pkg list' to explore"
-                echo "\033[36m========================================\033[0m"
-                """.trimIndent()
-            )
-        }
+            # cd wrapper with proper argument handling and PWD sync
+            cd() {
+                if [ "${'$'}#" -eq 0 ]; then
+                    builtin cd "${'$'}HOME" || return ${'$'}?
+                elif [ "${'$'}1" = "-" ]; then
+                    builtin cd "${'$'}OLDPWD" || return ${'$'}?
+                elif [ "${'$'}1" = "~" ]; then
+                    builtin cd "${'$'}HOME" || return ${'$'}?
+                elif [ "${'$'}{1#~/}" != "${'$'}1" ]; then
+                    builtin cd "${'$'}HOME/${'$'}{1#~/}" || return ${'$'}?
+                else
+                    builtin cd "${'$'}@" || return ${'$'}?
+                fi
+                export PWD
+            }
+
+            # Visual directory listing with file icons and colors
+            alias ls="python3 \"${'$'}PREFIX/bin/voidls.py\" 2>/dev/null || ls"
+            alias ll="python3 \"${'$'}PREFIX/bin/voidls.py\" -l 2>/dev/null || ls -la"
+            alias l="ls -CF"
+            alias pkg="${'$'}PREFIX/bin/pkg"
+            alias void="${'$'}PREFIX/bin/void"
+            alias ext="${'$'}PREFIX/bin/void-ext"
+            alias voidfs="${'$'}PREFIX/bin/voidfs"
+            alias help="${'$'}PREFIX/bin/help"
+            alias reload="${'$'}PREFIX/bin/reload"
+            alias cls="clear"
+            alias ipconfig="${'$'}PREFIX/bin/ipconfig"
+            alias voidls="python3 \"${'$'}PREFIX/bin/voidls.py\""
+            alias /pkg="void ext run pkg"
+            alias /file="void ext run file"
+            alias /hub="void ext list"
+            alias /ext="void ext list"
+
+            # MOTD from motd.json
+            if [ -f "${'$'}PREFIX/etc/motd.json" ]; then
+                python3 -c "
+import json, os
+try:
+    with open(os.path.expandvars('${'$'}PREFIX/etc/motd.json')) as f:
+        m = json.load(f)
+    if m.get('show_motd', True):
+        print('\033[36m========================================\033[0m')
+        print('\033[1;32m✔ ' + m.get('banner_title', 'VoidCore Shell Active [AArch64]') + '\033[0m')
+        print('  ' + m.get('welcome_message', 'Welcome to VoidTerm Sovereign Architecture'))
+        if m.get('show_device_info', True):
+            print('  Prefix: ' + os.environ.get('PREFIX', ''))
+        for hint in m.get('quick_hints', []):
+            print('  \033[33m•\033[0m ' + hint)
+        print('\033[36m========================================\033[0m')
+except Exception:
+    pass
+" 2>/dev/null
+            fi
+            """.trimIndent(),
+            overwrite = true
+        )
+
+        // 6. Initialize extensions directory structure
+        com.hybridengine.terminal.extensions.ExtensionManager.initExtensions(context)
     }
 
     private fun deployBaseApplets(usrBin: File) {
@@ -414,6 +644,55 @@ object DynamicCoreLoader {
             Log.w(TAG, "Notice: voidpkg.py extraction from assets: ${e.message}")
         }
 
+        // Deploy universal void-ext CLI router
+        val extDest = File(usrBin, "void-ext")
+        try {
+            context.assets.open("void_ext_router.py").use { input ->
+                FileOutputStream(extDest).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            extDest.setExecutable(true, false)
+            extDest.setReadable(true, false)
+            val extSymlink = File(usrBin, "ext")
+            if (!extSymlink.exists()) {
+                try {
+                    android.system.Os.symlink(extDest.absolutePath, extSymlink.absolutePath)
+                } catch (_: Exception) {}
+            }
+            Log.i(TAG, "Successfully extracted void-ext from assets.")
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice: void-ext extraction from assets: ${e.message}")
+        }
+
+        // Deploy Python SDK: site-packages/voidterm/__init__.py
+        val pySdkDir = File(context.filesDir, "usr/lib/python3.14/site-packages/voidterm").apply { mkdirs() }
+        val pySdkInit = File(pySdkDir, "__init__.py")
+        try {
+            context.assets.open("sdk/python/voidterm/__init__.py").use { input ->
+                FileOutputStream(pySdkInit).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            pySdkInit.setReadable(true, false)
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice: Python SDK extraction: ${e.message}")
+        }
+
+        // Deploy Node.js SDK: node_modules/voidterm/index.js
+        val jsSdkDir = File(context.filesDir, "usr/lib/node_modules/voidterm").apply { mkdirs() }
+        val jsSdkIndex = File(jsSdkDir, "index.js")
+        try {
+            context.assets.open("sdk/js/voidterm/index.js").use { input ->
+                FileOutputStream(jsSdkIndex).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            jsSdkIndex.setReadable(true, false)
+        } catch (e: Exception) {
+            Log.w(TAG, "Notice: Node.js SDK extraction: ${e.message}")
+        }
+
         // Deploy TLS CA bundle if present in assets
         val tlsDir = File(usrEtc, "tls").apply { mkdirs() }
         val certDest = File(tlsDir, "cert.pem")
@@ -488,6 +767,23 @@ object DynamicCoreLoader {
 
         try {
             Log.i(TAG, "Unpacking $assetName into ${usrDir.absolutePath}...")
+            
+            // Retain persistent backup copy of bootstrap container
+            val backupFile = File(usrDir, "var/bootstrap.bak.zip")
+            if (!backupFile.exists() || backupFile.length() < 1024) {
+                backupFile.parentFile?.mkdirs()
+                try {
+                    context.assets.open(assetName).use { rawIn ->
+                        FileOutputStream(backupFile).use { fos ->
+                            rawIn.copyTo(fos)
+                        }
+                    }
+                    Log.i(TAG, "Successfully archived bootstrap backup to ${backupFile.absolutePath}")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Notice: Unable to write bootstrap backup: ${e.message}")
+                }
+            }
+
             context.assets.open(assetName).use { rawIn ->
                 ZipInputStream(BufferedInputStream(rawIn)).use { zis ->
                     var entry = zis.nextEntry

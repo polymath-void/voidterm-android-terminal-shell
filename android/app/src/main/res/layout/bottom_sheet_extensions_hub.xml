@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="#1E1F29"
+    android:padding="16dp">
+
+    <!-- Top Drag Handle -->
+    <View
+        android:layout_width="40dp"
+        android:layout_height="4dp"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="12dp"
+        android:background="#44475A" />
+
+    <!-- Header & Action Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+
+        <TextView
+            android:id="@+id/tv_hub_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🧩 Extensions Hub"
+            android:textColor="#F8F8F2"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <!-- Master Safety Breaker: Kill All -->
+        <TextView
+            android:id="@+id/btn_kill_all_extensions"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#FF5555"
+            android:text="⚡ KILL ALL"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tv_hub_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Loading extensions..."
+        android:textColor="#6272A4"
+        android:textSize="12sp"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Extension Cards Container -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="360dp"
+        android:fillViewport="true">
+
+        <LinearLayout
+            android:id="@+id/extensions_list_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+    </ScrollView>
+</LinearLayout>

@@ -1,0 +1,19 @@
+{
+  "id": "pkg",
+  "name": "Package Manager TUI",
+  "version": "1.0.0",
+  "author": "VoidTerm Core",
+  "description": "Interactive terminal package browser with live search, install, update, and upgrade",
+  "runtime": "python",
+  "entry": "scripts/pkg_browser.py",
+  "singleton": true,
+  "permissions": [
+    "storage",
+    "network",
+    "terminal"
+  ],
+  "grant_type": "always",
+  "hooks": {
+    "on_slash": "scripts/pkg_browser.py"
+  }
+}

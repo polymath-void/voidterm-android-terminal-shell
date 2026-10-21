@@ -1,0 +1,18 @@
+{
+  "id": "file",
+  "name": "VFS File Manager",
+  "version": "1.0.0",
+  "author": "VoidTerm Core",
+  "description": "Interactive VFS directory browser, file manipulator, and text editor launcher",
+  "runtime": "python",
+  "entry": "scripts/file_browser.py",
+  "singleton": true,
+  "permissions": [
+    "storage",
+    "terminal"
+  ],
+  "grant_type": "always",
+  "hooks": {
+    "on_slash": "scripts/file_browser.py"
+  }
+}

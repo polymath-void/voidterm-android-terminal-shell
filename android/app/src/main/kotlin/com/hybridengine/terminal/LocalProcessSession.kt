@@ -97,7 +97,7 @@ class LocalProcessSession(
             }
 
             onOutput("\r\n\u001b[32m🚀 VoidTerm Shell Host Active\u001b[0m\r\n")
-            val engineType = "Rootless POSIX Container (Termux-Architecture)"
+            val engineType = "VoidCore Shell Active [AArch64] | Engine: VoidFS Dynamic POSIX Architecture"
             onOutput("\u001b[36mEngine:\u001b[0m $engineType | \u001b[35mShell:\u001b[0m $shellBinary\r\n")
             onOutput("\u001b[33mType 'help' or 'void' to begin.\u001b[0m\r\n\r\n")
 
@@ -110,7 +110,21 @@ class LocalProcessSession(
     fun write(command: String) {
         val writer = stdinWriter
         if (writer == null || process?.isAlive != true) {
-            // Auto-restart if exited
+            // Check if the user typed 'exit' or 'quit' - clean exit without respawn loop
+            let cleanExit = when (command.trim()) {
+                "exit", "quit" -> true
+                else -> false
+            }
+            if (cleanExit) {
+                // Notify SessionManager for clean tab close instead of auto-restart
+                onOutput("\r\n\u001b[33m[VoidTerm] Shell exit requested. Closing tab...\u001b[0m\r\n")
+                // Destroy the process without restarting
+                destroy()
+                // Notify parent (Activity) that this tab should close
+                // The SessionManager/Activity will handle tab close and finishing if last tab
+                return
+            }
+            // Auto-restart if exited for other reasons (e.g., command execution completed)
             start(File(lastWorkingDir))
         }
         try {
@@ -161,6 +175,25 @@ class LocalProcessSession(
     }
 
     fun isAlive(): Boolean = isRunning && process?.isAlive == true
+
+    fun sendSignalSigInt() {
+        val pid = getProcessPid(process) ?: return
+        // Send SIGINT to the entire child process group (negative pid)
+        try {
+            // Use kill command targeting the process group (-2 / SIGINT)
+            val pb = ProcessBuilder("kill", "-2", "-$pid")
+            val p = pb.start()
+            val code = p.waitFor()
+            if (code != 0) {
+                // Fallback to single PID
+                val pbFallback = ProcessBuilder("kill", "-2", "$pid")
+                pbFallback.start().waitFor()
+            }
+            Log.i(TAG, "SIGINT sent to process group PID=$pid")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to send SIGINT: ${e.message}")
+        }
+    }
 
     fun restart() {
         destroy()
