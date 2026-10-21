@@ -1,0 +1,18 @@
+{
+  "id": "alias",
+  "name": "Alias Manager",
+  "version": "1.0.0",
+  "author": "VoidTerm Core",
+  "description": "Interactive inspector and creator for shell aliases",
+  "runtime": "python",
+  "entry": "alias_manager.py",
+  "singleton": true,
+  "permissions": [
+    "storage",
+    "terminal"
+  ],
+  "grant_type": "always",
+  "hooks": {
+    "on_slash": "alias_manager.py"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "sys",
+  "name": "System Monitor",
+  "version": "1.0.0",
+  "author": "VoidTerm Core",
+  "description": "Live CPU, memory, battery, and top process monitor",
+  "runtime": "python",
+  "entry": "sys_monitor.py",
+  "singleton": false,
+  "permissions": [
+    "terminal"
+  ],
+  "grant_type": "always",
+  "hooks": {
+    "on_slash": "sys_monitor.py"
+  }
+}

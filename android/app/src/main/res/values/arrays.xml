@@ -1,16 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="theme_entries">
-        <item>Default (Dracula)</item>
-        <item>Dracula</item>
+        <item>Dracula (Default)</item>
         <item>Nord</item>
-        <item>Monokai</item>
+        <item>Gruvbox</item>
+        <item>Tokyo Night</item>
+        <item>Cyberpunk</item>
+        <item>Material Dark</item>
+        <item>Solarized Dark</item>
+        <item>One Dark</item>
+        <item>Monokai Pro</item>
+        <item>Matrix Green</item>
     </string-array>
     <string-array name="theme_values">
         <item>DRACULA</item>
-        <item>DRACULA</item>
         <item>NORD</item>
-        <item>MONOKAI</item>
+        <item>GRUVBOX</item>
+        <item>TOKYO_NIGHT</item>
+        <item>CYBERPUNK</item>
+        <item>MATERIAL_DARK</item>
+        <item>SOLARIZED_DARK</item>
+        <item>ONE_DARK</item>
+        <item>MONOKAI_PRO</item>
+        <item>MATRIX_GREEN</item>
     </string-array>
 
     <string-array name="cursor_style_entries">
@@ -22,5 +34,25 @@
         <item>BLOCK</item>
         <item>UNDERLINE</item>
         <item>BAR</item>
+    </string-array>
+
+    <string-array name="link_mode_entries">
+        <item>In-App WebView (Interactive with Full View)</item>
+        <item>External Browser (termux-open-url)</item>
+    </string-array>
+    <string-array name="link_mode_values">
+        <item>in_app</item>
+        <item>external</item>
+    </string-array>
+
+    <string-array name="font_family_entries">
+        <item>JetBrains Mono (Default)</item>
+        <item>Fira Code</item>
+        <item>System Monospace</item>
+    </string-array>
+    <string-array name="font_family_values">
+        <item>JetBrainsMono</item>
+        <item>FiraCode</item>
+        <item>Monospace</item>
     </string-array>
 </resources>

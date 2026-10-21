@@ -105,6 +105,13 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
 
+                sm.onAllSessionsClosed = {
+                    runOnUiThread {
+                        Log.i("VoidTerm", "All sessions closed via exit. Finishing Activity; TerminalService remains active.")
+                        finish()
+                    }
+                }
+
                 // Initial render of tabs and active session state
                 val active = sm.getActiveSession()
                 if (active != null) {
@@ -152,6 +159,33 @@ class MainActivity : AppCompatActivity() {
                     cardSelectionBar?.visibility = View.VISIBLE
                 } else {
                     cardSelectionBar?.visibility = View.GONE
+                }
+            }
+        }
+
+        // CWD Polling callback for cd / pushd / popd
+        terminalSurface.onCwdPollRequested = {
+            val sm = terminalService?.sessionManager
+            if (sm != null) {
+                Handler(Looper.getMainLooper()).postDelayed({
+                    val cwd = sm.updateActiveWorkingDir()
+                    val home = terminalService?.voidFS?.homeDir?.absolutePath ?: ""
+                    terminalSurface.updatePrompt(cwd, home)
+                }, 150L)
+            }
+        }
+
+        // Interactive URL click handling
+        terminalSurface.onUrlClicked = { url ->
+            runOnUiThread {
+                val mode = terminalSurface.config.linkOpenMode
+                if (mode == "external" || mode == "browser") {
+                    LinkDetector.openExternal(this@MainActivity, url)
+                } else {
+                    com.hybridengine.terminal.sheets.LinkWebViewBottomSheet.newInstance(url).show(
+                        supportFragmentManager,
+                        com.hybridengine.terminal.sheets.LinkWebViewBottomSheet.TAG
+                    )
                 }
             }
         }
@@ -207,10 +241,17 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<View>(R.id.btn_extensions_hub)?.setOnClickListener {
             it.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-            com.hybridengine.terminal.sheets.ExtensionsHubBottomSheet().show(
-                supportFragmentManager,
-                com.hybridengine.terminal.sheets.ExtensionsHubBottomSheet.TAG
-            )
+            if (terminalSurface.config.extHubTuiMode) {
+                // Launch Extension Hub in active terminal TUI console
+                terminalService?.sessionManager?.getActiveSession()?.let { activeTab ->
+                    ExtensionManager.executeSlashCommand(this, activeTab, "/hub")
+                }
+            } else {
+                com.hybridengine.terminal.sheets.ExtensionsHubBottomSheet().show(
+                    supportFragmentManager,
+                    com.hybridengine.terminal.sheets.ExtensionsHubBottomSheet.TAG
+                )
+            }
         }
 
         // Initialize and register installed polyglot extensions

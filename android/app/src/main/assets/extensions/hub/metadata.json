@@ -1,0 +1,17 @@
+{
+  "id": "hub",
+  "name": "Extension Hub TUI",
+  "version": "1.0.0",
+  "author": "VoidTerm Core",
+  "description": "Interactive TUI dashboard to inspect and launch installed extensions",
+  "runtime": "python",
+  "entry": "ext_hub_tui.py",
+  "singleton": true,
+  "permissions": [
+    "terminal"
+  ],
+  "grant_type": "always",
+  "hooks": {
+    "on_slash": "ext_hub_tui.py"
+  }
+}

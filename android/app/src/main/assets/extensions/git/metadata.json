@@ -1,0 +1,18 @@
+{
+  "id": "git",
+  "name": "Git Manager",
+  "version": "1.0.0",
+  "author": "VoidTerm Core",
+  "description": "Interactive TUI for git status, staging, committing, and log review",
+  "runtime": "python",
+  "entry": "git_manager.py",
+  "singleton": true,
+  "permissions": [
+    "storage",
+    "terminal"
+  ],
+  "grant_type": "always",
+  "hooks": {
+    "on_slash": "git_manager.py"
+  }
+}

@@ -60,11 +60,11 @@ class VoidFS(private val context: Context) {
                 }
             }
 
-            // Also maintain legacy $HOME/sdcard symlink for convenience
+            // Deduplicate storage: actively remove legacy $HOME/sdcard symlink and keep only $HOME/storage/shared
             val legacySdcard = File(homeDir, "sdcard")
-            if (!legacySdcard.exists()) {
+            if (legacySdcard.exists() || java.nio.file.Files.isSymbolicLink(legacySdcard.toPath())) {
                 try {
-                    android.system.Os.symlink(externalRoot.absolutePath, legacySdcard.absolutePath)
+                    legacySdcard.delete()
                 } catch (_: Exception) {}
             }
         } catch (e: Exception) {

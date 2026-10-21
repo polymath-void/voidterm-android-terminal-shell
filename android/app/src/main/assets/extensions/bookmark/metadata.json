@@ -1,0 +1,18 @@
+{
+  "id": "bookmark",
+  "name": "Directory Bookmarks",
+  "version": "1.0.0",
+  "author": "VoidTerm Core",
+  "description": "Fast navigation bookmarks for frequent directories",
+  "runtime": "python",
+  "entry": "bookmark_manager.py",
+  "singleton": true,
+  "permissions": [
+    "storage",
+    "terminal"
+  ],
+  "grant_type": "always",
+  "hooks": {
+    "on_slash": "bookmark_manager.py"
+  }
+}

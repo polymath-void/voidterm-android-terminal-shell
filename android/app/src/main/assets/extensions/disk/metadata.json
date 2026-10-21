@@ -1,0 +1,18 @@
+{
+  "id": "disk",
+  "name": "Disk Analyzer",
+  "version": "1.0.0",
+  "author": "VoidTerm Core",
+  "description": "Visual ASCII disk and storage capacity analyzer",
+  "runtime": "python",
+  "entry": "disk_analyzer.py",
+  "singleton": true,
+  "permissions": [
+    "storage",
+    "terminal"
+  ],
+  "grant_type": "always",
+  "hooks": {
+    "on_slash": "disk_analyzer.py"
+  }
+}

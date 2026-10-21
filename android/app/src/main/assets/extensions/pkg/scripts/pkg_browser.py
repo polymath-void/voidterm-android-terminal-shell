@@ -158,14 +158,35 @@ def render(packages, selected_idx, filter_str, top_offset, page_size):
     return filtered, selected_idx, top_offset
 
 def run_command(cmd_args):
-    """Restores cooked mode, runs command with live terminal stream, then prompts to continue."""
+    """Streams command execution with live progress output and formatted styling."""
     sys.stdout.write("\033[2J\033[H")
-    sys.stdout.write(f"{CLR_CYAN}{CLR_BOLD}>>> Executing: {' '.join(cmd_args)}{CLR_RESET}\r\n\r\n")
+    sys.stdout.write(f"{CLR_CYAN}{CLR_BOLD}╔══════════════════════════════════════════════════════════╗{CLR_RESET}\r\n")
+    sys.stdout.write(f"{CLR_CYAN}{CLR_BOLD}║  📦 Package Operation: {' '.join(cmd_args[-2:]):<33}║{CLR_RESET}\r\n")
+    sys.stdout.write(f"{CLR_CYAN}{CLR_BOLD}╚══════════════════════════════════════════════════════════╝{CLR_RESET}\r\n\r\n")
     sys.stdout.flush()
 
+    import time
+    start = time.time()
     try:
-        proc = subprocess.run(cmd_args)
-        status_msg = f"{CLR_GREEN}✔ Done (exit code {proc.returncode}){CLR_RESET}"
+        proc = subprocess.Popen(
+            cmd_args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1
+        )
+        if proc.stdout:
+            for line in iter(proc.stdout.readline, ""):
+                clean = line.rstrip()
+                elapsed = time.time() - start
+                sys.stdout.write(f"  {CLR_YELLOW}[pkg]{CLR_RESET} {clean}\r\n")
+                sys.stdout.flush()
+        proc.wait()
+        elapsed = time.time() - start
+        if proc.returncode == 0:
+            status_msg = f"{CLR_GREEN}✔ Operation Completed Successfully ({elapsed:.1f}s){CLR_RESET}"
+        else:
+            status_msg = f"{CLR_RED}✘ Operation Failed (Exit code {proc.returncode}, {elapsed:.1f}s){CLR_RESET}"
     except Exception as e:
         status_msg = f"{CLR_RED}✘ Execution error: {e}{CLR_RESET}"
 

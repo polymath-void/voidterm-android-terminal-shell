@@ -53,8 +53,12 @@ class TerminalSurfaceView @JvmOverloads constructor(
     // Dynamic prompt state
     var currentWorkingDirectory: String = "~"
         private set
-    var promptText: String = "voidterm:~$ "
+    var promptText: String = "void:~$ "
         private set
+
+    var onCwdPollRequested: (() -> Unit)? = null
+    var onUrlClicked: ((String) -> Unit)? = null
+    val detectedLinks = mutableListOf<LinkDetector.DetectedLink>()
 
     // Sticky modifier keys
     var isCtrlActive: Boolean = false
@@ -180,6 +184,16 @@ class TerminalSurfaceView @JvmOverloads constructor(
                 clearSelection()
                 return true
             }
+
+            // Check if user tapped on any detected link chip
+            val touchX = e.x
+            val touchY = e.y
+            val clicked = detectedLinks.firstOrNull { it.rect.contains(touchX, touchY) }
+            if (clicked != null) {
+                performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                onUrlClicked?.invoke(clicked.url)
+                return true
+            }
             return false
         }
     })
@@ -225,11 +239,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
     }
 
     fun updatePrompt(cwd: String, homeDir: String, username: String? = null) {
-        val user = username ?: try {
-            System.getProperty("user.name")?.takeIf { it.isNotBlank() && it != "root" && !it.startsWith("u0_") } ?: "piuu"
-        } catch (_: Exception) {
-            "piuu"
-        }
+        val user = username ?: config.username.ifBlank { "void" }
         val displayPath = when {
             cwd == homeDir -> "~"
             cwd.startsWith("$homeDir/") -> "~" + cwd.removePrefix(homeDir)
@@ -601,6 +611,13 @@ class TerminalSurfaceView @JvmOverloads constructor(
 
         // Dispatch command to Broker / Session
         onCommandSubmitted?.invoke(command)
+
+        // Poll CWD for any directory-changing command
+        val trimmed = command.trim()
+        if (trimmed == "cd" || trimmed.startsWith("cd ") || trimmed.startsWith("cd\t") || trimmed == "popd" || trimmed.startsWith("pushd")) {
+            onCwdPollRequested?.invoke()
+        }
+
         triggerRender()
     }
 
@@ -750,6 +767,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
+        reloadConfig()
         isRunning = true
         drawingThread = Thread(this, "VoidTerm-Renderer").apply { start() }
     }
@@ -1034,6 +1052,36 @@ class TerminalSurfaceView @JvmOverloads constructor(
                 // Draw end pin marker (circle with dark stroke)
                 canvas.drawCircle(endX, endY + (8 * density), 10 * density, handlePaint)
                 canvas.drawCircle(endX, endY + (8 * density), 10 * density, handleStrokePaint)
+            }
+        }
+
+        // 9. Recompute link clickable bounding boxes
+        if (config.linkDetection) {
+            val newDetectedLinks = mutableListOf<LinkDetector.DetectedLink>()
+            val fullText = cachedSpannableText
+            val matches = LinkDetector.URL_REGEX.findAll(fullText)
+            for (match in matches) {
+                val s = match.range.first
+                val e = match.range.last + 1
+                if (s in 0 until fullText.length && e <= fullText.length) {
+                    val sLine = staticLayout.getLineForOffset(s)
+                    val sX = paddingX + staticLayout.getPrimaryHorizontal(s)
+                    val eX = paddingX + staticLayout.getPrimaryHorizontal(e).coerceAtLeast(sX + 40f)
+                    val topY = paddingY - currentScrollOffset + staticLayout.getLineTop(sLine)
+                    val botY = paddingY - currentScrollOffset + staticLayout.getLineBottom(sLine)
+                    if (botY >= 0 && topY <= height) {
+                        newDetectedLinks.add(
+                            LinkDetector.DetectedLink(
+                                url = match.value,
+                                rect = android.graphics.RectF(sX, topY, eX, botY)
+                            )
+                        )
+                    }
+                }
+            }
+            synchronized(detectedLinks) {
+                detectedLinks.clear()
+                detectedLinks.addAll(newDetectedLinks)
             }
         }
     }

@@ -433,6 +433,61 @@ class TerminalConfig(private val context: Context) {
             updateVoidTermJson("row2_unlocked", value)
         }
 
+    var username: String
+        get() {
+            val json = DynamicCoreLoader.loadConfig(context)
+            if (json.has("username")) return json.getString("username")
+            return prefs.getString("username", "void") ?: "void"
+        }
+        set(value) {
+            prefs.edit().putString("username", value).apply()
+            updateVoidTermJson("username", value)
+        }
+
+    var showCommandSeparator: Boolean
+        get() {
+            val json = DynamicCoreLoader.loadConfig(context)
+            if (json.has("show_command_separator")) return json.optBoolean("show_command_separator", true)
+            return prefs.getBoolean("show_command_separator", true)
+        }
+        set(value) {
+            prefs.edit().putBoolean("show_command_separator", value).apply()
+            updateVoidTermJson("show_command_separator", value)
+        }
+
+    var linkDetection: Boolean
+        get() {
+            val json = DynamicCoreLoader.loadConfig(context)
+            if (json.has("link_detection")) return json.optBoolean("link_detection", true)
+            return prefs.getBoolean("link_detection", true)
+        }
+        set(value) {
+            prefs.edit().putBoolean("link_detection", value).apply()
+            updateVoidTermJson("link_detection", value)
+        }
+
+    var linkOpenMode: String
+        get() {
+            val json = DynamicCoreLoader.loadConfig(context)
+            if (json.has("link_open_mode")) return json.optString("link_open_mode", "in_app")
+            return prefs.getString("link_open_mode", "in_app") ?: "in_app"
+        }
+        set(value) {
+            prefs.edit().putString("link_open_mode", value).apply()
+            updateVoidTermJson("link_open_mode", value)
+        }
+
+    var extHubTuiMode: Boolean
+        get() {
+            val json = DynamicCoreLoader.loadConfig(context)
+            if (json.has("ext_hub_tui_mode")) return json.optBoolean("ext_hub_tui_mode", true)
+            return prefs.getBoolean("ext_hub_tui_mode", true)
+        }
+        set(value) {
+            prefs.edit().putBoolean("ext_hub_tui_mode", value).apply()
+            updateVoidTermJson("ext_hub_tui_mode", value)
+        }
+
     private fun resolvePath(path: String): String {
         val home = java.io.File(context.filesDir, "home").absolutePath
         return path.replace("\$HOME", home).replace("~", home)

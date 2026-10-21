@@ -3,6 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
+    <!-- Appearance -->
     <PreferenceCategory
         android:title="Appearance"
         app:iconSpaceReserved="false">
@@ -17,6 +18,16 @@
             app:useSimpleSummaryProvider="true"
             app:iconSpaceReserved="false" />
 
+        <ListPreference
+            android:key="font_family"
+            android:title="Font Family"
+            android:dialogTitle="Select Font Family"
+            android:entries="@array/font_family_entries"
+            android:entryValues="@array/font_family_values"
+            android:defaultValue="JetBrainsMono"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
         <EditTextPreference
             android:key="font_size"
             android:title="Font Size"
@@ -28,6 +39,7 @@
 
     </PreferenceCategory>
 
+    <!-- Cursor Settings -->
     <PreferenceCategory
         android:title="Cursor Settings"
         app:iconSpaceReserved="false">
@@ -46,6 +58,76 @@
             android:key="cursor_blink"
             android:title="Cursor Blink"
             android:summary="Enable 500ms cursor blink animation"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <!-- Shell Identity -->
+    <PreferenceCategory
+        android:title="Shell Identity"
+        app:iconSpaceReserved="false">
+
+        <EditTextPreference
+            android:key="username"
+            android:title="Username"
+            android:dialogTitle="Prompt Username"
+            android:summary="Displayed in prompt (e.g. void, dev, user)"
+            android:defaultValue="void"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+        <EditTextPreference
+            android:key="default_working_dir"
+            android:title="Default Working Directory"
+            android:dialogTitle="Initial Directory"
+            android:summary="Directory spawned on new session ($HOME, storage)"
+            android:defaultValue="$HOME"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <!-- Terminal Formatting & Interaction -->
+    <PreferenceCategory
+        android:title="Formatting &amp; Links"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="show_command_separator"
+            android:title="Structured Command Blocks"
+            android:summary="Highlight command lines with visual accent bar"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:key="link_detection"
+            android:title="Interactive URL Detection"
+            android:summary="Detect URLs in terminal output for tap-to-open"
+            android:defaultValue="true"
+            app:iconSpaceReserved="false" />
+
+        <ListPreference
+            android:key="link_open_mode"
+            android:title="Link Open Mode"
+            android:dialogTitle="Select Link Target"
+            android:entries="@array/link_mode_entries"
+            android:entryValues="@array/link_mode_values"
+            android:defaultValue="in_app"
+            app:useSimpleSummaryProvider="true"
+            app:iconSpaceReserved="false" />
+
+    </PreferenceCategory>
+
+    <!-- Extensions Platform -->
+    <PreferenceCategory
+        android:title="Extensions &amp; Tools"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:key="ext_hub_tui_mode"
+            android:title="Extension Hub TUI Mode"
+            android:summary="Launch Extension Hub inside terminal TUI console"
             android:defaultValue="true"
             app:iconSpaceReserved="false" />
 

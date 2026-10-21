@@ -1,0 +1,18 @@
+{
+  "id": "notes",
+  "name": "Workspace Notes",
+  "version": "1.0.0",
+  "author": "VoidTerm Core",
+  "description": "Quick scratchpad and developer notes manager",
+  "runtime": "python",
+  "entry": "notes_manager.py",
+  "singleton": true,
+  "permissions": [
+    "storage",
+    "terminal"
+  ],
+  "grant_type": "always",
+  "hooks": {
+    "on_slash": "notes_manager.py"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "id": "history",
+  "name": "Shell History Search",
+  "version": "1.0.0",
+  "author": "VoidTerm Core",
+  "description": "Interactive fuzzy shell command history search",
+  "runtime": "python",
+  "entry": "history_search.py",
+  "singleton": true,
+  "permissions": [
+    "storage",
+    "terminal"
+  ],
+  "grant_type": "always",
+  "hooks": {
+    "on_slash": "history_search.py"
+  }
+}

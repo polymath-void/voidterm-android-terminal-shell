@@ -40,6 +40,7 @@ class SessionManager(
     var onSessionOutput: ((TabSession, String) -> Unit)? = null
     var onActiveSessionChanged: ((TabSession) -> Unit)? = null
     var onSessionsListChanged: (() -> Unit)? = null
+    var onAllSessionsClosed: (() -> Unit)? = null
 
     fun getActiveSession(): TabSession? {
         if (sessions.isEmpty()) return null
@@ -77,6 +78,15 @@ class SessionManager(
             workingDir = workDirFile.absolutePath
         )
         tabRef = newTab
+
+        processSession.onExitRequested = {
+            mainHandler.post {
+                val idx = sessions.indexOf(newTab)
+                if (idx in sessions.indices) {
+                    closeSession(idx)
+                }
+            }
+        }
 
         sessions.add(newTab)
         processSession.start(workDirFile)
@@ -145,7 +155,7 @@ class SessionManager(
         sessions.removeAt(index)
 
         if (sessions.isEmpty()) {
-            createSession("Tab 1")
+            onAllSessionsClosed?.invoke()
         } else {
             val newIndex = (if (index >= sessions.size) sessions.size - 1 else index).coerceAtLeast(0)
             activeIndex = newIndex

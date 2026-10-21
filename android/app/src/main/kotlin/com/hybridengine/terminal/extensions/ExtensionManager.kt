@@ -49,8 +49,10 @@ object ExtensionManager {
         Log.i(TAG, "Initializing extensions at ${baseDir.absolutePath}")
 
         // 1. Deploy built-in extensions from assets if missing
-        deployAssetExtension(context, "pkg")
-        deployAssetExtension(context, "file")
+        val builtInExts = listOf("hub", "pkg", "file", "git", "sys", "env", "notes", "alias", "bookmark", "history", "disk")
+        for (extId in builtInExts) {
+            deployAssetExtension(context, extId)
+        }
 
         // 2. Register all discovered extensions into NodeOS DB
         val telemetry = NodeOsTelemetrySync(context)

@@ -1,0 +1,17 @@
+{
+  "id": "env",
+  "name": "Environment Editor",
+  "version": "1.0.0",
+  "author": "VoidTerm Core",
+  "description": "Interactive inspector for shell environment variables",
+  "runtime": "python",
+  "entry": "env_editor.py",
+  "singleton": true,
+  "permissions": [
+    "terminal"
+  ],
+  "grant_type": "always",
+  "hooks": {
+    "on_slash": "env_editor.py"
+  }
+}

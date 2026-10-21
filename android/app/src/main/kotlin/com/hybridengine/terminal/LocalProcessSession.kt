@@ -18,6 +18,8 @@ class LocalProcessSession(
     val voidFS: VoidFS,
     private val onOutput: (String) -> Unit
 ) {
+    var onExitRequested: (() -> Unit)? = null
+
     private var process: Process? = null
     private var stdinWriter: OutputStreamWriter? = null
     private val ioExecutor = Executors.newFixedThreadPool(2)
@@ -120,8 +122,8 @@ class LocalProcessSession(
                 onOutput("\r\n\u001b[33m[VoidTerm] Shell exit requested. Closing tab...\u001b[0m\r\n")
                 // Destroy the process without restarting
                 destroy()
-                // Notify parent (Activity) that this tab should close
-                // The SessionManager/Activity will handle tab close and finishing if last tab
+                // Notify parent (SessionManager / Activity) that this tab exited
+                onExitRequested?.invoke()
                 return
             }
             // Auto-restart if exited for other reasons (e.g., command execution completed)
