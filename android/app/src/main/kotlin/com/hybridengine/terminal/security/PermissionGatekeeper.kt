@@ -20,7 +20,7 @@ object PermissionGatekeeper {
     private const val TAG = "PermissionGatekeeper"
 
     // ACL: Maps (extension_id, endpoint) -> GrantStatus
-    private val acl = mutableMapOf<String, mutableMapOf<String, GrantStatus>>()
+    private val acl = mutableMapOf<String, MutableMap<String, GrantStatus>>()
 
     // Grant type tracking: "once", "days_X", "always", "denied"
     private val grantExpiration = mutableMapOf<String, Long>() // epoch millis

@@ -5,6 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.os.PowerManager
 import android.util.Log
+import com.hybridengine.terminal.TerminalService
+import java.util.Timer
+import java.util.TimerTask
 
 /**
  * CronBroadcastReceiver: Handles scheduled cron task execution via AlarmManager.
@@ -23,47 +26,32 @@ class CronBroadcastReceiver : BroadcastReceiver() {
         Log.i(TAG, "Cron task triggered: $taskName - executing: $command")
 
         try {
-            // Ensure WakLock is held during command execution so the CPU stays awake
-            // during Doze mode for the duration of the command
+            // Ensure WakeLock is held during command execution so the CPU stays awake
             val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-            val wakeLock: PowerManager.WakeLock? = if (powerManager != null) {
-                val wk = powerManager.newWakeLock(
-                    PowerManager.PARTIAL_WAKE_LOCK,
-                    "VoidTerm:Cron:$taskName"
-                )
-                wk.apply { acquire() }
-                wk
+            val wakeLock: PowerManager.WakeLock? = powerManager?.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "VoidTerm:Cron:$taskName"
+            )?.apply {
+                acquire(10000L) // 10 second safety ceiling
             }
 
-            // Execute the command via the terminal service
-            // Use the existing DynamicCoreLoader/TerminalService command execution pipeline
-            val execIntent = Intent(context, TerminalService::class.java).apply {
-                action = com.hybridengine.terminal.TerminalService.ACTION_EXECUTE_COMMAND
-                putExtra(com.hybridengine.terminal.TerminalService.EXTRA_COMMAND, command)
-            }
+            // Execute the command via TerminalService
+            TerminalService.execute(context, command)
 
-            // Start service to process the command
-            context.startService(execIntent)
-
-            // Release waklock after short delay to allow command output to be captured
-            java.util.Timer().also { timer ->
-                timer.schedule(
-                    java.util.Task(null, wakeLock),
-                    5000 // 5 second grace period
-                )
-            }
-        }
-
-        // Inner class for TimerTask - releases wakelock
-        private class Task(val wakeLock: PowerManager.WakeLock?, val context: Context?) : java.util.TimerTask() {
-            override fun run() {
-                wakeLock?.release()
-                if (context != null) {
-                    // Stop the service after task completion
-                    val stopIntent = Intent(context, CronBroadcastReceiver::class.java)
-                    context.stopService(stopIntent)
+            // Release wakelock after short grace period to allow command execution to start
+            Timer().schedule(object : TimerTask() {
+                override fun run() {
+                    try {
+                        if (wakeLock?.isHeld == true) {
+                            wakeLock.release()
+                        }
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to release wakeLock", e)
+                    }
                 }
-            }
+            }, 5000L)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error executing scheduled cron task", e)
         }
     }
 }

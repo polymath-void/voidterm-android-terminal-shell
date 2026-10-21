@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Binder
 import android.os.Build
+import android.os.FileObserver
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
@@ -59,7 +60,7 @@ class TerminalService : Service() {
 
         // 3. Setup FileObserver for hot-reload filesystem trigger (replaces insecure am broadcast)
         val runDir = java.io.File(filesDir, "usr/var/run").apply { mkdirs() }
-        reloadTriggerObserver = object : android.os.FileObserver(runDir.absolutePath, CREATE or CLOSE_WRITE or MOVED_TO) {
+        reloadTriggerObserver = object : FileObserver(runDir.absolutePath, CREATE or CLOSE_WRITE or MOVED_TO) {
             private var lastReload = 0L
             override fun onEvent(event: Int, path: String?) {
                 if (path == ".reload_trigger") {

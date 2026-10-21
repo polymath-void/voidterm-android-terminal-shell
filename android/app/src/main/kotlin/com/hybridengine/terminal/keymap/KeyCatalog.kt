@@ -191,6 +191,63 @@ object KeyCatalog {
         rowWeight = 1.0f
     )
 
+    // ── Navigation & Editing Keys ──
+
+    val BACKSPACE: KeyDefinition = KeyDefinition(
+        keyCode = android.view.KeyEvent.KEYCODE_DEL,
+        label = "BKSP",
+        action = {},
+        isModifier = false,
+        isActionKey = true,
+        isAccentKey = false,
+        keyType = "navigation",
+        rowWeight = 1.0f
+    )
+
+    val DELETE: KeyDefinition = KeyDefinition(
+        keyCode = android.view.KeyEvent.KEYCODE_FORWARD_DEL,
+        label = "DEL",
+        action = {},
+        isModifier = false,
+        isActionKey = true,
+        isAccentKey = false,
+        keyType = "navigation",
+        rowWeight = 1.0f
+    )
+
+    val INSERT: KeyDefinition = KeyDefinition(
+        keyCode = android.view.KeyEvent.KEYCODE_INSERT,
+        label = "INS",
+        action = {},
+        isModifier = false,
+        isActionKey = true,
+        isAccentKey = false,
+        keyType = "navigation",
+        rowWeight = 1.0f
+    )
+
+    val HOME: KeyDefinition = KeyDefinition(
+        keyCode = android.view.KeyEvent.KEYCODE_MOVE_HOME,
+        label = "HOME",
+        action = {},
+        isModifier = false,
+        isActionKey = true,
+        isAccentKey = false,
+        keyType = "navigation",
+        rowWeight = 1.0f
+    )
+
+    val END: KeyDefinition = KeyDefinition(
+        keyCode = android.view.KeyEvent.KEYCODE_MOVE_END,
+        label = "END",
+        action = {},
+        isModifier = false,
+        isActionKey = true,
+        isAccentKey = false,
+        keyType = "navigation",
+        rowWeight = 1.0f
+    )
+
     // ── Symbol Keys ──
 
     fun symbolKey(sym: String): KeyDefinition = KeyDefinition(

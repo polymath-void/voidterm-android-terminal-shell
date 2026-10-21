@@ -96,7 +96,7 @@ class VoidApiServer(private val context: Context) {
             val reader = BufferedReader(InputStreamReader(client.inputStream, Charsets.UTF_8))
             val writer = PrintWriter(client.outputStream, true)
 
-            var line: String?
+            var line: String? = null
             while (isRunning && reader.readLine().also { line = it } != null) {
                 val reqStr = line?.trim() ?: continue
                 if (reqStr.isEmpty()) continue
@@ -144,7 +144,7 @@ class VoidApiServer(private val context: Context) {
             // If HTTP POST, read headers and extract body
             if (firstLine.startsWith("POST") || firstLine.startsWith("GET")) {
                 var contentLength = 0
-                var headerLine: String?
+                var headerLine: String? = null
                 while (reader.readLine().also { headerLine = it } != null && headerLine!!.isNotEmpty()) {
                     if (headerLine!!.lowercase().startsWith("content-length:")) {
                         contentLength = headerLine!!.substring(15).trim().toIntOrNull() ?: 0
