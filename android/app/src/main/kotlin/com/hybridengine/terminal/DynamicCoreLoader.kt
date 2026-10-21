@@ -246,6 +246,7 @@ object DynamicCoreLoader {
                 export PYTHONHOME="${'$'}PREFIX"
                 export PYTHONPATH="${'$'}PREFIX/lib/python3.14:${'$'}PREFIX/lib/python3.14/lib-dynload"
                 export SSL_CERT_FILE="${'$'}PREFIX/etc/tls/cert.pem"
+                export GODEBUG="netdns=cgo"
                 exec "${'$'}PREFIX/bin/python3" "${'$'}PREFIX/bin/voidpkg.py" "${'$'}@"
             fi
 
@@ -480,6 +481,8 @@ object DynamicCoreLoader {
             export HOME="${'$'}HOME"
             export TMPDIR="${'$'}PREFIX/tmp"
             export LD_LIBRARY_PATH="${'$'}PREFIX/lib"
+            export SSL_CERT_FILE="${'$'}PREFIX/etc/tls/cert.pem"
+            export GODEBUG="netdns=cgo"
             export PATH="${'$'}PREFIX/bin:/system/bin:/system/xbin"
             export TERM="xterm-256color"
 
@@ -623,6 +626,7 @@ except Exception:
                 FileOutputStream(file).use {
                     it.write(content.toByteArray(Charsets.UTF_8))
                 }
+                file.setReadable(true, false)
             } catch (e: Exception) {
                 Log.e(TAG, "Error deploying file ${file.name}: ${e.message}")
             }
@@ -694,7 +698,11 @@ except Exception:
         }
 
         // Deploy TLS CA bundle if present in assets
-        val tlsDir = File(usrEtc, "tls").apply { mkdirs() }
+        val tlsDir = File(usrEtc, "tls").apply {
+            mkdirs()
+            setReadable(true, false)
+            setExecutable(true, false)
+        }
         val certDest = File(tlsDir, "cert.pem")
         if (!certDest.exists()) {
             try {

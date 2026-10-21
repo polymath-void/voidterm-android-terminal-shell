@@ -55,6 +55,8 @@ class LocalProcessSession(
         env["TERMINFO"] = "$usrPath/share/terminfo"
         env["TERMINFO_DIRS"] = "$usrPath/share/terminfo:$usrPath/etc/terminfo"
         env["VOIDTERM_VERSION"] = "1.0.0-alpha"
+        env["SSL_CERT_FILE"] = "$usrPath/etc/tls/cert.pem"
+        env["GODEBUG"] = "netdns=cgo"
 
         // Ensure executable permissions on all usr/bin scripts
         File(usrPath, "bin").listFiles()?.forEach { file ->
@@ -181,18 +183,33 @@ class LocalProcessSession(
     fun sendSignalSigInt() {
         val proc = process ?: return
         val pid = getProcessPid(proc) ?: return
-        // Send SIGINT to the entire child process group (negative pid)
         try {
-            // Use kill command targeting the process group (-2 / SIGINT)
-            val pb = ProcessBuilder("kill", "-2", "-$pid")
-            val p = pb.start()
-            val code = p.waitFor()
-            if (code != 0) {
-                // Fallback to single PID
-                val pbFallback = ProcessBuilder("kill", "-2", "$pid")
-                pbFallback.start().waitFor()
+            // First inspect /proc/$pid/task/$pid/children to target active foreground child process
+            val childrenFile = File("/proc/$pid/task/$pid/children")
+            val childPids = if (childrenFile.exists()) {
+                childrenFile.readText().trim().split(Regex("\\s+")).filter { it.isNotBlank() }
+            } else {
+                emptyList()
             }
-            Log.i(TAG, "SIGINT sent to process group PID=$pid")
+
+            if (childPids.isNotEmpty()) {
+                for (cpid in childPids) {
+                    try {
+                        ProcessBuilder("kill", "-2", cpid).start().waitFor()
+                    } catch (_: Exception) {}
+                }
+                Log.i(TAG, "SIGINT sent to active child process(es): ${childPids.joinToString()}")
+            } else {
+                // Fallback to targeting shell process
+                val pb = ProcessBuilder("kill", "-2", "-$pid")
+                val p = pb.start()
+                val code = p.waitFor()
+                if (code != 0) {
+                    val pbFallback = ProcessBuilder("kill", "-2", "$pid")
+                    pbFallback.start().waitFor()
+                }
+                Log.i(TAG, "SIGINT sent to shell PID=$pid")
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to send SIGINT: ${e.message}")
         }

@@ -204,6 +204,12 @@ def search_packages(query):
     catalog = load_catalog()
     q = query.lower()
     matches = []
+    
+    # Built-in packages
+    if "agy".startswith(q) or "antigravity".startswith(q) or q in "antigravity agy":
+        matches.append(("agy", "1.4.4", "Google Antigravity CLI for autonomous AI agents"))
+        matches.append(("antigravity", "1.4.4", "Alias for Google Antigravity CLI"))
+
     for name, data in catalog.items():
         desc = data.get("description", "").lower()
         if q in name.lower() or q in desc:
@@ -277,6 +283,127 @@ def fix_shebang(filepath):
     except Exception:
         pass
 
+def install_antigravity_cli():
+    manifest_url = "https://antigravity-cli-auto-updater-974169037036.us-central1.run.app/manifests/android_arm64.json"
+    fallback_url = "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.4.4-4783783166214144/android-arm/cli_android_arm64.tar.gz"
+    ssl_ctx = get_ssl_context()
+    
+    version = "1.4.4"
+    download_url = fallback_url
+    expected_sha512 = None
+    
+    print("\033[36m[*] Querying Google Antigravity release manifest...\033[0m")
+    try:
+        req = urllib.request.Request(manifest_url, headers={"User-Agent": "VoidPkg/1.0 (Android; AArch64)"})
+        with urllib.request.urlopen(req, timeout=10, context=ssl_ctx) as resp:
+            manifest = json.loads(resp.read().decode("utf-8"))
+            version = manifest.get("version", version)
+            download_url = manifest.get("url", download_url)
+            expected_sha512 = manifest.get("sha512")
+    except Exception as e:
+        print(f"\033[33m[!] Using fallback release URL: {e}\033[0m")
+        
+    print(f"\033[36m[*] Downloading Google Antigravity CLI v{version}...\033[0m")
+    try:
+        req = urllib.request.Request(download_url, headers={"User-Agent": "VoidPkg/1.0 (Android; AArch64)"})
+        with urllib.request.urlopen(req, timeout=45, context=ssl_ctx) as resp:
+            tar_data = resp.read()
+    except Exception as e:
+        print(f"\033[31m[!] Failed to download Antigravity CLI: {e}\033[0m")
+        return False
+        
+    if expected_sha512:
+        import hashlib
+        actual_hash = hashlib.sha512(tar_data).hexdigest()
+        if actual_hash != expected_sha512:
+            print(f"\033[31m[!] Checksum mismatch for Antigravity package!\033[0m")
+            return False
+
+    os.makedirs(BIN_DIR, exist_ok=True)
+    agy_bin = os.path.join(BIN_DIR, "agy.bin")
+    agy_launcher = os.path.join(BIN_DIR, "agy")
+    antigravity_link = os.path.join(BIN_DIR, "antigravity")
+    
+    print("\033[35m[→] Extracting native antigravity binary...\033[0m")
+    try:
+        with tarfile.open(fileobj=io.BytesIO(tar_data), mode="r:gz") as tar:
+            member = tar.getmember("antigravity")
+            extracted = tar.extractfile(member)
+            if extracted is None:
+                raise ValueError("antigravity binary not found in archive")
+            with open(agy_bin, "wb") as f:
+                shutil.copyfileobj(extracted, f)
+        os.chmod(agy_bin, 0o755)
+    except Exception as e:
+        print(f"\033[31m[!] Extraction failed: {e}\033[0m")
+        return False
+
+    launcher_content = """#!/data/data/com.hybridengine.terminal/files/usr/bin/bash
+# VoidTerm Antigravity CLI Launcher
+export PREFIX=\"$(cd \"$(dirname \"$0\")/..\" && pwd)\"
+export HOME=\"${HOME:-$(cd \"$PREFIX/../home\" && pwd)}\"
+export LD_LIBRARY_PATH=\"$PREFIX/lib\"
+export SSL_CERT_FILE=\"$PREFIX/etc/tls/cert.pem\"
+export GODEBUG=\"netdns=cgo\"
+export PATH=\"$PREFIX/bin:/system/bin:/system/xbin\"
+
+BINARY=\"$PREFIX/bin/agy.bin\"
+
+if [ ! -f \"$BINARY\" ]; then
+    echo \"Error: Antigravity binary not found at $BINARY\"
+    exit 1
+fi
+
+if [ \"$#\" -eq 0 ] && [ ! -t 0 ]; then
+    echo -e \"\\033[36m==========================================================\\033[0m\"
+    echo -e \"\\033[1;32m🚀 Google Antigravity CLI (agy) - VoidTerm Edition\\033[0m\"
+    echo -e \"\\033[36m==========================================================\\033[0m\"
+    echo \"\"
+    echo \"To start a prompt or trigger authentication in VoidTerm:\"
+    echo -e \"   \\033[33magy -p \\\"Hello\\\"\\033[0m\"
+    echo \"\"
+    echo \"To execute coding or research tasks:\"
+    echo -e \"   \\033[33magy -p \\\"Your prompt here\\\"\\033[0m\"
+    echo \"\"
+    echo \"To view full CLI help and available subcommands:\"
+    echo -e \"   \\033[33magy --help\\033[0m\"
+    echo \"\"
+    echo -e \"\\033[36m==========================================================\\033[0m\"
+    exit 0
+fi
+
+exec \"$BINARY\" \"$@\"
+"""
+    with open(agy_launcher, "w") as f:
+        f.write(launcher_content)
+    os.chmod(agy_launcher, 0o755)
+    
+    if os.path.islink(antigravity_link) or os.path.exists(antigravity_link):
+        try:
+            os.remove(antigravity_link)
+        except Exception:
+            pass
+    try:
+        os.symlink("agy", antigravity_link)
+    except Exception:
+        pass
+        
+    ensure_dirs()
+    installed_record = os.path.join(INSTALLED_DIR, "agy.json")
+    try:
+        with open(installed_record, "w") as f:
+            json.dump({
+                "name": "agy",
+                "version": version,
+                "description": "Google Antigravity CLI for autonomous AI agents",
+                "files": ["bin/agy", "bin/agy.bin", "bin/antigravity"]
+            }, f, indent=2)
+    except Exception:
+        pass
+        
+    print(f"\033[1;32m[✔] Google Antigravity CLI (agy v{version}) successfully installed!\033[0m")
+    return True
+
 def install_single_pkg(pkg_name, catalog, installed, _visiting=None):
     if _visiting is None:
         _visiting = set()
@@ -285,6 +412,9 @@ def install_single_pkg(pkg_name, catalog, installed, _visiting=None):
     if pkg_name in _visiting:
         return True
     _visiting.add(pkg_name)
+
+    if pkg_name.lower() in ("agy", "antigravity"):
+        return install_antigravity_cli()
 
     if pkg_name not in catalog:
         aliases = {
@@ -469,59 +599,6 @@ Usage:
   pkg status                   Display prefix and storage telemetry
   pkg doctor                   Verify subsystem integrity and library linkages
 """)
-
-def run_doctor():
-    print("\033[36m=== VoidTerm Subsystem Health & Doctor ===\033[0m")
-    all_ok = True
-
-    # 1. Check bootstrap marker
-    boot_marker = os.path.join(PREFIX, ".bootstrapped")
-    if os.path.exists(boot_marker):
-        with open(boot_marker, "r") as f:
-            v = f.read().strip()
-        print(f"  \033[32m✔\033[0m Bootstrap Rootfs: Active (version {v})")
-    else:
-        print(f"  \033[33m⚠\033[0m Bootstrap Rootfs: Marker not found")
-
-    # 2. Check essential binaries
-    for b in ["bash", "sh", "python3", "patchelf"]:
-        bp = os.path.join(BIN_DIR, b)
-        if os.path.exists(bp) and os.access(bp, os.X_OK):
-            print(f"  \033[32m✔\033[0m Binary {b}: Present & Executable")
-        else:
-            print(f"  \033[31m✘\033[0m Binary {b}: Missing or Not Executable")
-            all_ok = False
-
-    # 3. Check core shared libraries
-    for l in ["libreadline.so.8", "libncursesw.so.6", "libz.so.1", "libc++_shared.so", "libandroid-support.so"]:
-        lp = os.path.join(LIB_DIR, l)
-        if os.path.exists(lp) and os.path.getsize(lp) > 1024:
-            print(f"  \033[32m✔\033[0m Shared Library {l}: Valid ELF ({os.path.getsize(lp)} bytes)")
-        else:
-            print(f"  \033[31m✘\033[0m Shared Library {l}: Missing or Placeholder")
-            all_ok = False
-
-    # 4. Check TLS CA bundle
-    cert_path = os.path.join(ETC_DIR, "tls", "cert.pem")
-    if os.path.exists(cert_path) and os.path.getsize(cert_path) > 1024:
-        print(f"  \033[32m✔\033[0m TLS CA Bundle: Present ({os.path.getsize(cert_path)} bytes)")
-    else:
-        print(f"  \033[33m⚠\033[0m TLS CA Bundle: Missing (SSL fallback mode active)")
-
-    # 5. Check terminfo
-    ti_path = os.path.join(PREFIX, "share", "terminfo", "x", "xterm-256color")
-    ti_alt = os.path.join(ETC_DIR, "terminfo", "x", "xterm-256color")
-    if os.path.exists(ti_path) or os.path.exists(ti_alt):
-        print(f"  \033[32m✔\033[0m Terminfo (xterm-256color): Present")
-    else:
-        print(f"  \033[33m⚠\033[0m Terminfo: Missing")
-
-    print("")
-    if all_ok:
-        print("\033[32m[PASS] VoidTerm core container is healthy and stable.\033[0m")
-    else:
-        print("\033[31m[FAIL] VoidTerm detected missing dependencies. Run reload or reinstall.\033[0m")
-    return all_ok
 
 def run_doctor():
     print("\033[36m=== VoidTerm Subsystem Health & Doctor ===\033[0m")
