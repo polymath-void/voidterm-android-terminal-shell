@@ -104,7 +104,7 @@ class ExtensionsHubBottomSheet : BottomSheetDialogFragment() {
                 text = ext.name
                 setTextColor(Color.parseColor("#F8F8F2"))
                 textSize = 15f
-                textStyle = android.graphics.Typeface.BOLD
+                setTypeface(null, android.graphics.Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
 
@@ -130,7 +130,7 @@ class ExtensionsHubBottomSheet : BottomSheetDialogFragment() {
                 }
                 setPadding((12 * density).toInt(), (4 * density).toInt(), (12 * density).toInt(), (4 * density).toInt())
                 textSize = 12f
-                textStyle = android.graphics.Typeface.BOLD
+                setTypeface(null, android.graphics.Typeface.BOLD)
 
                 if (ext.isRunning) {
                     text = "KILL"

@@ -22,6 +22,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.HapticFeedbackConstants
+import android.view.KeyEvent
 import android.view.View
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -32,11 +33,13 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.material.card.MaterialCardView
+import com.hybridengine.terminal.sheets.TabsCardBottomSheet
+import com.hybridengine.terminal.sheets.ExtensionsHubBottomSheet
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var terminalSurface: TerminalSurfaceView
-    private var terminalService: TerminalService? = null
+    var terminalService: TerminalService? = null
     private var isBound = false
 
     // Tab Bar Views
@@ -310,27 +313,35 @@ class MainActivity : AppCompatActivity() {
                     if (trimmed.startsWith("/")) {
                         if (trimmed == "/hub" || trimmed == "/ext") {
                             runOnUiThread {
-                                com.hybridengine.terminal.sheets.ExtensionsHubBottomSheet().show(
+                                ExtensionsHubBottomSheet().show(
                                     supportFragmentManager,
-                                    com.hybridengine.terminal.sheets.ExtensionsHubBottomSheet.TAG
+                                    ExtensionsHubBottomSheet.TAG
                                 )
                             }
-                            return@onCommandSubmitted
+                        } else {
+                            val slashHandled = com.hybridengine.terminal.extensions.ExtensionManager.executeSlashCommand(
+                                this@MainActivity,
+                                activeTab,
+                                trimmed
+                            )
+                            if (!slashHandled) {
+                                activeTab.processSession.write(trimmed)
+                                terminalSurface.postDelayed({
+                                    val cwd = sm.updateActiveWorkingDir()
+                                    val home = sm.voidFS.homeDir.absolutePath
+                                    terminalSurface.updatePrompt(cwd, home)
+                                }, 100)
+                            }
                         }
-                        val slashHandled = com.hybridengine.terminal.extensions.ExtensionManager.executeSlashCommand(
-                            this@MainActivity,
-                            activeTab,
-                            trimmed
-                        )
-                        if (slashHandled) return@onCommandSubmitted
+                    } else {
+                        activeTab.processSession.write(trimmed)
+                        // Update working directory and prompt after command execution
+                        terminalSurface.postDelayed({
+                            val cwd = sm.updateActiveWorkingDir()
+                            val home = sm.voidFS.homeDir.absolutePath
+                            terminalSurface.updatePrompt(cwd, home)
+                        }, 100)
                     }
-                    activeTab.processSession.write(trimmed)
-                    // Update working directory and prompt after command execution
-                    terminalSurface.postDelayed({
-                        val cwd = sm.updateActiveWorkingDir()
-                        val home = sm.voidFS.homeDir.absolutePath
-                        terminalSurface.updatePrompt(cwd, home)
-                    }, 100)
                 } else {
                     terminalService?.executeCommand(trimmed)
                 }

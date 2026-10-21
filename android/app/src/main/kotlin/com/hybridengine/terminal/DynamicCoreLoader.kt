@@ -97,15 +97,15 @@ object DynamicCoreLoader {
                 - `cursor_blink_rate_ms`: Cursor blink interval in milliseconds (default: 500ms).
                 
                 ## Shell & Workspace
-                - `default_shell`: Absolute path to initial shell binary (default: `/system/bin/sh` or `$PREFIX/bin/bash`).
-                - `default_working_dir`: Directory to open on app startup and in new tabs (e.g. `$HOME` or `~/Projects`).
+                - `default_shell`: Absolute path to initial shell binary (default: `/system/bin/sh` or `${'$'}PREFIX/bin/bash`).
+                - `default_working_dir`: Directory to open on app startup and in new tabs (e.g. `${'$'}HOME` or `~/Projects`).
                 
                 ## Keyboard Shortcuts & Row Budgeting
                 - `row1_limit`, `row2_limit`: Number of keys visible per row before horizontal scroll (default: 8).
                 - `row1_unlocked`, `row2_unlocked`: Set to `true` to enable smooth horizontal swipe scrolling for extra keys.
                 
                 ## MOTD & Welcome Banner
-                - Configured in `$PREFIX/etc/motd.json`. Adjust `banner_title`, `welcome_message`, and `quick_hints`.
+                - Configured in `${'$'}PREFIX/etc/motd.json`. Adjust `banner_title`, `welcome_message`, and `quick_hints`.
                 """.trimIndent()
             )
         }

@@ -111,7 +111,7 @@ class LocalProcessSession(
         val writer = stdinWriter
         if (writer == null || process?.isAlive != true) {
             // Check if the user typed 'exit' or 'quit' - clean exit without respawn loop
-            let cleanExit = when (command.trim()) {
+            val cleanExit = when (command.trim()) {
                 "exit", "quit" -> true
                 else -> false
             }
@@ -177,7 +177,8 @@ class LocalProcessSession(
     fun isAlive(): Boolean = isRunning && process?.isAlive == true
 
     fun sendSignalSigInt() {
-        val pid = getProcessPid(process) ?: return
+        val proc = process ?: return
+        val pid = getProcessPid(proc) ?: return
         // Send SIGINT to the entire child process group (negative pid)
         try {
             // Use kill command targeting the process group (-2 / SIGINT)

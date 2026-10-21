@@ -61,7 +61,7 @@ class TabsCardBottomSheet : BottomSheetDialogFragment() {
             text = "⊞ Active Terminal Tabs"
             setTextColor(Color.parseColor("#F8F8F2"))
             textSize = 18f
-            textStyle = android.graphics.Typeface.BOLD
+            setTypeface(null, android.graphics.Typeface.BOLD)
             setPadding(0, 0, 0, (12 * density).toInt())
         }
         root.addView(titleTv)
@@ -130,7 +130,7 @@ class TabsCardBottomSheet : BottomSheetDialogFragment() {
                 text = "$pinBadge$activeBadge${tab.title}"
                 setTextColor(if (isActive) Color.parseColor("#50FA7B") else Color.parseColor("#F8F8F2"))
                 textSize = 15f
-                textStyle = android.graphics.Typeface.BOLD
+                setTypeface(null, android.graphics.Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
 
