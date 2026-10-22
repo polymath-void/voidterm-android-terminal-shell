@@ -20,6 +20,7 @@ object DynamicCoreLoader {
 
     fun initialize(context: Context) {
         val filesDir = context.filesDir
+        val usrDir = File(filesDir, "usr")
         val usrBin = File(filesDir, "usr/bin").apply { mkdirs() }
         val usrEtc = File(filesDir, "usr/etc").apply { mkdirs() }
         val usrLib = File(filesDir, "usr/lib").apply { mkdirs() }
