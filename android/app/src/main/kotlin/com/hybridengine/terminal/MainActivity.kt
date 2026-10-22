@@ -81,7 +81,7 @@ class MainActivity : AppCompatActivity() {
                 sm.onSessionOutput = { tab, output ->
                     runOnUiThread {
                         if (tab == sm.getActiveSession()) {
-                            terminalSurface.appendOutput(output)
+                            terminalSurface.triggerRender()
                             val cwd = sm.updateActiveWorkingDir()
                             val home = service.voidFS.homeDir.absolutePath
                             terminalSurface.updatePrompt(cwd, home)
@@ -91,9 +91,7 @@ class MainActivity : AppCompatActivity() {
 
                 sm.onActiveSessionChanged = { activeTab ->
                     runOnUiThread {
-                        terminalSurface.setTerminalLines(activeTab.lines)
-                        terminalSurface.setInputState(activeTab.currentInput, activeTab.cursorPosition)
-                        terminalSurface.setScrollOffset(activeTab.scrollOffset)
+                        terminalSurface.attachSession(activeTab)
                         val home = service.voidFS.homeDir.absolutePath
                         terminalSurface.updatePrompt(activeTab.workingDir, home)
                         renderTabs(sm)
@@ -116,7 +114,7 @@ class MainActivity : AppCompatActivity() {
                 // Initial render of tabs and active session state
                 val active = sm.getActiveSession()
                 if (active != null) {
-                    terminalSurface.setTerminalLines(active.lines)
+                    terminalSurface.attachSession(active)
                     val home = service.voidFS.homeDir.absolutePath
                     terminalSurface.updatePrompt(active.workingDir, home)
                 }
@@ -345,7 +343,13 @@ class MainActivity : AppCompatActivity() {
         val serviceIntent = Intent(this, TerminalService::class.java)
         bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
 
-        // 4. Connect Native Inline Terminal Input directly to the active session
+        // 4. Connect Native Terminal Input directly to the active session
+        terminalSurface.onInputBytes = { bytes ->
+            val sm = terminalService?.sessionManager
+            val activeTab = sm?.getActiveSession()
+            activeTab?.processSession?.write(bytes)
+        }
+
         terminalSurface.onCommandSubmitted = { command ->
             val trimmed = command.trim()
             if (trimmed.isNotEmpty()) {
@@ -367,7 +371,7 @@ class MainActivity : AppCompatActivity() {
                                 trimmed
                             )
                             if (!slashHandled) {
-                                activeTab.processSession.write(trimmed)
+                                activeTab.processSession.write(trimmed + "\n")
                                 terminalSurface.postDelayed({
                                     val cwd = sm.updateActiveWorkingDir()
                                     val home = sm.voidFS.homeDir.absolutePath
@@ -376,8 +380,7 @@ class MainActivity : AppCompatActivity() {
                             }
                         }
                     } else {
-                        activeTab.processSession.write(trimmed)
-                        // Update working directory and prompt after command execution
+                        activeTab.processSession.write(trimmed + "\n")
                         terminalSurface.postDelayed({
                             val cwd = sm.updateActiveWorkingDir()
                             val home = sm.voidFS.homeDir.absolutePath

@@ -34,7 +34,7 @@ def get_char():
             ch = sys.stdin.read(1)
             if ch == "\x1b":
                 ch2 = sys.stdin.read(1)
-                if ch2 == "[":
+                if ch2 in ("[", "O"):
                     ch3 = sys.stdin.read(1)
                     return f"\x1b[{ch3}"
                 return "\x1b"
@@ -124,27 +124,34 @@ def main():
     selected_idx = 0
     status_msg = ""
 
-    while True:
-        render(extensions, selected_idx, status_msg)
-        ch = get_char()
+    # Enter alternate screen buffer & hide cursor
+    sys.stdout.write("\033[?1049h\033[?25l")
+    sys.stdout.flush()
 
-        if ch in ("q", "Q", "\x03"):
-            sys.stdout.write("\033[2J\033[H")
-            sys.stdout.flush()
-            break
-        elif ch in ("\x1b[A", "k"):
-            selected_idx = max(0, selected_idx - 1)
-            status_msg = ""
-        elif ch in ("\x1b[B", "j"):
-            selected_idx = min(len(extensions) - 1, selected_idx + 1)
-            status_msg = ""
-        elif ch in ("\r", "\n", "l", "L"):
-            if extensions and 0 <= selected_idx < len(extensions):
-                status_msg = launch_extension(extensions[selected_idx])
+    try:
+        while True:
+            render(extensions, selected_idx, status_msg)
+            ch = get_char()
+
+            if ch in ("q", "Q", "\x03"):
+                break
+            elif ch in ("\x1b[A", "k"):
+                selected_idx = max(0, selected_idx - 1)
+                status_msg = ""
+            elif ch in ("\x1b[B", "j"):
+                selected_idx = min(len(extensions) - 1, selected_idx + 1)
+                status_msg = ""
+            elif ch in ("\r", "\n", "l", "L"):
+                if extensions and 0 <= selected_idx < len(extensions):
+                    status_msg = launch_extension(extensions[selected_idx])
+                    extensions = load_extensions()
+            elif ch in ("r", "R"):
                 extensions = load_extensions()
-        elif ch in ("r", "R"):
-            extensions = load_extensions()
-            status_msg = "Reloaded extension catalog."
+                status_msg = "Reloaded extension catalog."
+    finally:
+        # Restore primary screen buffer & show cursor
+        sys.stdout.write("\033[?25h\033[?1049l")
+        sys.stdout.flush()
 
 if __name__ == "__main__":
     main()

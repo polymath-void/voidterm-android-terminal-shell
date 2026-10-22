@@ -22,6 +22,7 @@ class LocalProcessSession(
     val voidFS: VoidFS,
     private val onOutput: (String) -> Unit
 ) {
+    var onRawOutput: ((ByteArray, Int) -> Unit)? = null
     var onExitRequested: (() -> Unit)? = null
 
     private var process: Process? = null
@@ -90,11 +91,15 @@ class LocalProcessSession(
                     // Single unified PTY stream reader (stdout & stderr are multiplexed on PTY slave)
                     ioExecutor.execute {
                         try {
-                            val reader = InputStreamReader(inStream, Charsets.UTF_8)
-                            val buffer = CharArray(2048)
-                            var readChars = 0
-                            while (isRunning && reader.read(buffer).also { readChars = it } != -1) {
-                                onOutput(String(buffer, 0, readChars))
+                            val buffer = ByteArray(4096)
+                            var readBytes = 0
+                            while (isRunning && inStream.read(buffer).also { readBytes = it } != -1) {
+                                val rawCb = onRawOutput
+                                if (rawCb != null) {
+                                    rawCb(buffer, readBytes)
+                                } else {
+                                    onOutput(String(buffer, 0, readBytes, Charsets.UTF_8))
+                                }
                             }
                         } catch (e: Exception) {
                             if (isRunning) Log.w(TAG, "PTY reader closed: ${e.message}")
@@ -175,36 +180,48 @@ class LocalProcessSession(
     }
 
     fun write(command: String) {
-        val writer = stdinWriter
-        if (writer == null || process?.isAlive != true) {
-            // Check if the user typed 'exit' or 'quit' - clean exit without respawn loop
+        if (!isAlive()) {
             val cleanExit = when (command.trim()) {
                 "exit", "quit" -> true
                 else -> false
             }
             if (cleanExit) {
-                // Notify SessionManager for clean tab close instead of auto-restart
                 onOutput("\r\n\u001b[33m[VoidTerm] Shell exit requested. Closing tab...\u001b[0m\r\n")
-                // Destroy the process without restarting
                 destroy()
-                // Notify parent (SessionManager / Activity) that this tab exited
                 onExitRequested?.invoke()
                 return
             }
-            // Auto-restart if exited for other reasons (e.g., command execution completed)
             start(File(lastWorkingDir))
         }
         try {
             stdinWriter?.apply {
                 write(command)
-                if (!command.endsWith("\n")) {
-                    write("\n")
-                }
                 flush()
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error writing to process stdin", e)
             onOutput("\r\n\u001b[31m[Process Error] ${e.message}\u001b[0m\r\n")
+        }
+    }
+
+    fun write(bytes: ByteArray, offset: Int = 0, length: Int = bytes.size) {
+        if (!isAlive()) {
+            start(File(lastWorkingDir))
+        }
+        try {
+            val parcelFd = pfd
+            if (parcelFd != null) {
+                val out = FileOutputStream(parcelFd.fileDescriptor)
+                out.write(bytes, offset, length)
+                out.flush()
+            } else {
+                process?.outputStream?.apply {
+                    write(bytes, offset, length)
+                    flush()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error writing raw bytes to process stdin", e)
         }
     }
 
@@ -242,7 +259,22 @@ class LocalProcessSession(
 
     fun isAlive(): Boolean {
         if (!isRunning) return false
-        if (ptyPid > 0) return true
+        if (ptyPid > 0) {
+            if (isPtyLoaded) {
+                return try {
+                    val status = checkProcessStatusNative(ptyPid)
+                    if (status == -999) {
+                        true
+                    } else {
+                        isRunning = false
+                        false
+                    }
+                } catch (_: Exception) {
+                    true
+                }
+            }
+            return true
+        }
         return process?.isAlive == true
     }
 
@@ -394,5 +426,8 @@ class LocalProcessSession(
 
         @JvmStatic
         private external fun waitForProcessNative(pid: Int): Int
+
+        @JvmStatic
+        private external fun checkProcessStatusNative(pid: Int): Int
     }
 }

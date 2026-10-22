@@ -13,6 +13,7 @@ class TabSession(
     val id: Int,
     var title: String,
     val processSession: LocalProcessSession,
+    val emulator: TerminalEmulator = TerminalEmulator(TerminalBuffer(24, 80)),
     val lines: MutableList<List<AnsiParser.StyledText>> = mutableListOf(),
     val commandHistory: MutableList<String> = mutableListOf(),
     var currentInput: String = "",
@@ -58,15 +59,17 @@ class SessionManager(
         var tabRef: TabSession? = null
         val processSession = LocalProcessSession(context, voidFS) { output ->
             tabRef?.let { tab ->
-                val styled = ansiParser.parseLines(output)
-                synchronized(tab.lines) {
-                    tab.lines.addAll(styled)
-                    if (tab.lines.size > 1000) {
-                        tab.lines.subList(0, tab.lines.size - 1000).clear()
-                    }
-                }
+                tab.emulator.feed(output)
                 mainHandler.post {
                     onSessionOutput?.invoke(tab, output)
+                }
+            }
+        }
+        processSession.onRawOutput = { bytes, len ->
+            tabRef?.let { tab ->
+                tab.emulator.feed(bytes, len)
+                mainHandler.post {
+                    onSessionOutput?.invoke(tab, "")
                 }
             }
         }
@@ -78,6 +81,13 @@ class SessionManager(
             workingDir = workDirFile.absolutePath
         )
         tabRef = newTab
+
+        newTab.emulator.onTitleChanged = { newTitle ->
+            val idx = sessions.indexOf(newTab)
+            if (idx in sessions.indices && newTitle.isNotBlank()) {
+                renameSession(idx, newTitle)
+            }
+        }
 
         processSession.onExitRequested = {
             mainHandler.post {

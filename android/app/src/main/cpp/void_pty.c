@@ -153,3 +153,26 @@ Java_com_hybridengine_terminal_LocalProcessSession_waitForProcessNative(
     }
     return status;
 }
+
+JNIEXPORT jint JNICALL
+Java_com_hybridengine_terminal_LocalProcessSession_checkProcessStatusNative(
+    JNIEnv *env,
+    jclass clazz,
+    jint pid)
+{
+    int status = 0;
+    pid_t res = waitpid(pid, &status, WNOHANG);
+    if (res == 0) {
+        // Still running
+        return -999;
+    } else if (res == pid) {
+        if (WIFEXITED(status)) {
+            return WEXITSTATUS(status);
+        } else if (WIFSIGNALED(status)) {
+            return 128 + WTERMSIG(status);
+        }
+        return status;
+    }
+    // Process not found or error
+    return -1;
+}
