@@ -79,7 +79,11 @@ class LocalProcessSession(
         if (isPtyLoaded) {
             try {
                 val envArray = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
-                val argsArray = arrayOf("-l", "--rcfile", "$homePath/.bashrc") // Login shell with explicit rcfile
+                val argsArray = if (shellBinary.endsWith("bash")) {
+                    arrayOf("--login")
+                } else {
+                    arrayOf("-l")
+                }
                 val ptyRes = createSubprocessNative(shellBinary, argsArray, envArray, dir.absolutePath, 24, 80)
                 if (ptyRes != null && ptyRes.size >= 2 && ptyRes[0] >= 0) {
                     ptyMasterFd = ptyRes[0]
@@ -115,9 +119,8 @@ class LocalProcessSession(
                         try {
                             val exitCode = waitForProcessNative(ptyPid)
                             Log.i(TAG, "Native PTY process $ptyPid exited with code $exitCode")
-                            if (isRunning) {
-                                onOutput("\r\n\u001b[33m[Process completed with code $exitCode]\u001b[0m\r\n")
-                            }
+                            isRunning = false
+                            onOutput("\r\n\u001b[33m[Process completed with code $exitCode]\u001b[0m\r\n")
                         } catch (e: Exception) {}
                     }
 
@@ -209,9 +212,7 @@ class LocalProcessSession(
     }
 
     fun write(bytes: ByteArray, offset: Int = 0, length: Int = bytes.size) {
-        if (!isAlive()) {
-            start(File(lastWorkingDir))
-        }
+        if (!isRunning) return
         try {
             val parcelFd = pfd
             if (parcelFd != null) {
