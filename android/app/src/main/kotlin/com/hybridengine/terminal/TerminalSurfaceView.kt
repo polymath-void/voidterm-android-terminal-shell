@@ -736,13 +736,13 @@ class TerminalSurfaceView @JvmOverloads constructor(
 
                 cursorPaint.color = config.theme.cursor
                 when (config.cursorStyle) {
-                    TerminalConfig.CursorStyle.UNDERLINE -> {
+                    CursorStyle.UNDERLINE -> {
                         canvas.drawRect(curX, curY + charHeight - 4f * density, curX + charWidth, curY + charHeight, cursorPaint)
                     }
-                    TerminalConfig.CursorStyle.BAR -> {
+                    CursorStyle.BAR -> {
                         canvas.drawRect(curX, curY, curX + 2.5f * density, curY + charHeight, cursorPaint)
                     }
-                    TerminalConfig.CursorStyle.BLOCK -> {
+                    CursorStyle.BLOCK, else -> {
                         canvas.drawRect(curX, curY, curX + charWidth, curY + charHeight, cursorPaint)
                         // Invert text inside block cursor
                         val line = buffer.getLine(curRow, 0)
