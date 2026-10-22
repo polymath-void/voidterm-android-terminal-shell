@@ -92,7 +92,7 @@ class LocalProcessSession(
                         try {
                             val reader = InputStreamReader(inStream, Charsets.UTF_8)
                             val buffer = CharArray(2048)
-                            var readChars: Int
+                            var readChars = 0
                             while (isRunning && reader.read(buffer).also { readChars = it } != -1) {
                                 onOutput(String(buffer, 0, readChars))
                             }
@@ -109,7 +109,7 @@ class LocalProcessSession(
                             if (isRunning) {
                                 onOutput("\r\n\u001b[33m[Process completed with code $exitCode]\u001b[0m\r\n")
                             }
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {}
                     }
 
                     onOutput("\r\n\u001b[32m🚀 VoidTerm Shell Host Active (Native POSIX PTY Engine)\u001b[0m\r\n")
