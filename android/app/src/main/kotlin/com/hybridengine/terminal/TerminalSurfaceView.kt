@@ -742,7 +742,7 @@ class TerminalSurfaceView @JvmOverloads constructor(
                     CursorStyle.BAR -> {
                         canvas.drawRect(curX, curY, curX + 2.5f * density, curY + charHeight, cursorPaint)
                     }
-                    CursorStyle.BLOCK, else -> {
+                    else -> {
                         canvas.drawRect(curX, curY, curX + charWidth, curY + charHeight, cursorPaint)
                         // Invert text inside block cursor
                         val line = buffer.getLine(curRow, 0)
