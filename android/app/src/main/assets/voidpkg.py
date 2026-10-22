@@ -246,6 +246,8 @@ def retarget_elf(filepath):
     if not os.path.isfile(filepath) or os.path.islink(filepath):
         return
     try:
+        try: os.chmod(filepath, 0o755)
+        except Exception: pass
         with open(filepath, "rb") as f:
             magic = f.read(4)
         if magic == b"\x7fELF":
@@ -254,8 +256,12 @@ def retarget_elf(filepath):
                 tmp_path = filepath + ".patch_tmp"
                 try:
                     shutil.copy2(filepath, tmp_path)
+                    try: os.chmod(tmp_path, 0o755)
+                    except Exception: pass
                     res = subprocess.run([PATCHELF, "--set-rpath", rpath, tmp_path], check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     if res.returncode == 0:
+                        try: os.chmod(filepath, 0o755)
+                        except Exception: pass
                         os.replace(tmp_path, filepath)
                     elif os.path.exists(tmp_path):
                         os.remove(tmp_path)
@@ -263,7 +269,8 @@ def retarget_elf(filepath):
                     if os.path.exists(tmp_path):
                         try: os.remove(tmp_path)
                         except Exception: pass
-            os.chmod(filepath, 0o755)
+            try: os.chmod(filepath, 0o755)
+            except Exception: pass
     except Exception:
         pass
 
@@ -271,6 +278,8 @@ def fix_shebang(filepath):
     if not os.path.isfile(filepath) or os.path.islink(filepath):
         return
     try:
+        try: os.chmod(filepath, 0o755)
+        except Exception: pass
         with open(filepath, "rb") as f:
             header = f.read(2)
         if header == b"#!":
@@ -278,9 +287,12 @@ def fix_shebang(filepath):
                 content = f.read()
             if "/data/data/com.termux/files/usr/bin/" in content:
                 content = content.replace("/data/data/com.termux/files/usr/bin/", f"{PREFIX}/bin/")
+                try: os.chmod(filepath, 0o755)
+                except Exception: pass
                 with open(filepath, "w", encoding="utf-8") as f:
                     f.write(content)
-            os.chmod(filepath, 0o755)
+            try: os.chmod(filepath, 0o755)
+            except Exception: pass
     except Exception:
         pass
 
@@ -327,6 +339,11 @@ def install_antigravity_cli():
     
     print("\033[35m[→] Extracting native antigravity binary...\033[0m")
     try:
+        if os.path.lexists(agy_bin):
+            try: os.chmod(agy_bin, 0o755)
+            except Exception: pass
+            try: os.remove(agy_bin)
+            except Exception: pass
         with tarfile.open(fileobj=io.BytesIO(tar_data), mode="r:gz") as tar:
             member = tar.getmember("antigravity")
             extracted = tar.extractfile(member)
@@ -536,11 +553,20 @@ def install_single_pkg(pkg_name, catalog, installed, _visiting=None):
         target = os.path.join(PREFIX, rel_path)
         if member.isdir():
             os.makedirs(target, exist_ok=True)
+            try: os.chmod(target, 0o755)
+            except Exception: pass
         elif member.isfile() or member.islnk() or member.issym():
-            os.makedirs(os.path.dirname(target), exist_ok=True)
+            parent_dir = os.path.dirname(target)
+            os.makedirs(parent_dir, exist_ok=True)
+            try: os.chmod(parent_dir, 0o755)
+            except Exception: pass
+
             if os.path.lexists(target):
+                try: os.chmod(target, 0o755)
+                except Exception: pass
                 try: os.remove(target)
                 except Exception: pass
+
             if member.issym() or member.islnk():
                 link_target = member.linkname
                 if "files/usr/" in link_target:
@@ -550,8 +576,9 @@ def install_single_pkg(pkg_name, catalog, installed, _visiting=None):
             else:
                 with open(target, "wb") as f:
                     f.write(tar.extractfile(member).read())
-                mode = member.mode | 0o755 if "bin/" in rel_path else member.mode
-                os.chmod(target, mode)
+                mode = (member.mode | 0o755) if ("bin/" in rel_path or "lib/" in rel_path) else (member.mode | 0o644)
+                try: os.chmod(target, mode & 0o777)
+                except Exception: pass
                 retarget_elf(target)
                 fix_shebang(target)
             installed_files.append(rel_path)

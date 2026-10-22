@@ -51,6 +51,10 @@ class LocalProcessSession(
         envMap["HOME"] = homePath
         envMap["PREFIX"] = usrPath
         envMap["TMPDIR"] = tmpPath
+        envMap["USER"] = "voidterm"
+        envMap["LOGNAME"] = "voidterm"
+        envMap["HOSTNAME"] = "voidterm"
+        envMap["PS1"] = "\\[\\e[1;32m\\]voidterm\\[\\e[0m\\]:\\[\\e[1;36m\\]\\w\\[\\e[0m\\]\\$ "
         envMap["ENV"] = "$homePath/.bashrc"
         envMap["TERM"] = "xterm-256color"
         envMap["COLORTERM"] = "truecolor"
@@ -75,7 +79,7 @@ class LocalProcessSession(
         if (isPtyLoaded) {
             try {
                 val envArray = envMap.map { "${it.key}=${it.value}" }.toTypedArray()
-                val argsArray = arrayOf("-l") // Login shell
+                val argsArray = arrayOf("-l", "--rcfile", "$homePath/.bashrc") // Login shell with explicit rcfile
                 val ptyRes = createSubprocessNative(shellBinary, argsArray, envArray, dir.absolutePath, 24, 80)
                 if (ptyRes != null && ptyRes.size >= 2 && ptyRes[0] >= 0) {
                     ptyMasterFd = ptyRes[0]

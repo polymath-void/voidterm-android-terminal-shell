@@ -472,23 +472,46 @@ object DynamicCoreLoader {
             """.trimIndent()
         )
 
-        // 5. Deploy default .bashrc in home
+        deployScript(
+            File(usrBin, "hub"),
+            """
+            #!/system/bin/sh
+            SELF_DIR="${'$'}(cd "${'$'}(dirname "${'$'}0")" && pwd)"
+            exec "${'$'}SELF_DIR/void-ext" run hub "$@"
+            """.trimIndent(),
+            overwrite = true
+        )
+
+        // 5. Deploy default login profiles and .bashrc in home
+        val profileContent = """
+            # VoidTerm Sovereign POSIX Login Profile
+            if [ -f "${'$'}HOME/.bashrc" ]; then
+                . "${'$'}HOME/.bashrc"
+            fi
+        """.trimIndent()
+        deployScript(File(homeDir, ".bash_profile"), profileContent, overwrite = true)
+        deployScript(File(homeDir, ".profile"), profileContent, overwrite = true)
+
         val bashrc = File(homeDir, ".bashrc")
         deployScript(
             bashrc,
             """
-            export PREFIX="${'$'}(cd "${'$'}SELF_DIR/.." && pwd)"
-            export HOME="${'$'}HOME"
+            export PREFIX="${usrDir.absolutePath}"
+            export HOME="${homeDir.absolutePath}"
             export TMPDIR="${'$'}PREFIX/tmp"
+            export USER="voidterm"
+            export LOGNAME="voidterm"
+            export HOSTNAME="voidterm"
             export LD_LIBRARY_PATH="${'$'}PREFIX/lib"
             export SSL_CERT_FILE="${'$'}PREFIX/etc/tls/cert.pem"
             export GODEBUG="netdns=cgo"
             export PATH="${'$'}PREFIX/bin:/system/bin:/system/xbin"
             export TERM="xterm-256color"
+            export COLORTERM="truecolor"
 
             # Dynamic prompt function: username in green, colon in white, directory in cyan, $ in yellow
             __void_prompt() {
-                _u="${'$'}{USER:-${'$'}(whoami 2>/dev/null || echo voidterm)}"
+                _u="${'$'}{USER:-voidterm}"
                 _d="${'$'}PWD"
                 case "${'$'}_d" in
                     "${'$'}HOME") _d="~" ;;
@@ -527,9 +550,19 @@ object DynamicCoreLoader {
             alias cls="clear"
             alias ipconfig="${'$'}PREFIX/bin/ipconfig"
             alias voidls="python3 \"${'$'}PREFIX/bin/voidls.py\""
+
+            # VoidTerm Extension Slash Commands
+            alias /hub="void ext run hub"
             alias /pkg="void ext run pkg"
             alias /file="void ext run file"
-            alias /hub="void ext list"
+            alias /sys="void ext run sys"
+            alias /git="void ext run git"
+            alias /notes="void ext run notes"
+            alias /env="void ext run env"
+            alias /disk="void ext run disk"
+            alias /alias="void ext run alias"
+            alias /bookmark="void ext run bookmark"
+            alias /history="void ext run history"
             alias /ext="void ext list"
 
             # MOTD from motd.json
@@ -648,26 +681,45 @@ except Exception:
             Log.w(TAG, "Notice: voidpkg.py extraction from assets: ${e.message}")
         }
 
-        // Deploy universal void-ext CLI router
-        val extDest = File(usrBin, "void-ext")
+        // Deploy universal void-ext CLI router and Python script
+        val extPyDest = File(usrBin, "void_ext_router.py")
         try {
             context.assets.open("void_ext_router.py").use { input ->
-                FileOutputStream(extDest).use { output ->
+                FileOutputStream(extPyDest).use { output ->
                     input.copyTo(output)
                 }
             }
-            extDest.setExecutable(true, false)
-            extDest.setReadable(true, false)
-            val extSymlink = File(usrBin, "ext")
-            if (!extSymlink.exists()) {
-                try {
-                    android.system.Os.symlink(extDest.absolutePath, extSymlink.absolutePath)
-                } catch (_: Exception) {}
-            }
-            Log.i(TAG, "Successfully extracted void-ext from assets.")
+            extPyDest.setExecutable(true, false)
+            extPyDest.setReadable(true, false)
         } catch (e: Exception) {
-            Log.w(TAG, "Notice: void-ext extraction from assets: ${e.message}")
+            Log.w(TAG, "Notice: void_ext_router.py extraction from assets: ${e.message}")
         }
+
+        val extDest = File(usrBin, "void-ext")
+        deployScript(
+            extDest,
+            """
+            #!/system/bin/sh
+            # Universal VoidTerm Extension CLI Runner
+            SELF_DIR="${'$'}(cd "${'$'}(dirname "${'$'}0")" && pwd)"
+            PREFIX="${'$'}(cd "${'$'}SELF_DIR/.." && pwd)"
+            export PREFIX="${'$'}PREFIX"
+            export PYTHONPATH="${'$'}PREFIX/lib/python3.14:${'$'}PREFIX/lib/python3.14/lib-dynload"
+            if [ -x "${'$'}PREFIX/bin/python3" ]; then
+                exec "${'$'}PREFIX/bin/python3" "${'$'}SELF_DIR/void_ext_router.py" "${'$'}@"
+            else
+                exec python3 "${'$'}SELF_DIR/void_ext_router.py" "${'$'}@"
+            fi
+            """.trimIndent(),
+            overwrite = true
+        )
+        val extSymlink = File(usrBin, "ext")
+        if (!extSymlink.exists()) {
+            try {
+                android.system.Os.symlink(extDest.absolutePath, extSymlink.absolutePath)
+            } catch (_: Exception) {}
+        }
+        Log.i(TAG, "Successfully deployed void-ext CLI wrapper.")
 
         // Deploy Python SDK: site-packages/voidterm/__init__.py
         val pySdkDir = File(context.filesDir, "usr/lib/python3.14/site-packages/voidterm").apply { mkdirs() }
